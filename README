@@ -1,0 +1,16 @@
+
+
+How to run:
+1) $ make clean; make
+2) $ source /nfs/beacon_inst/env.sh; ./powPerfController 1234
+
+3)in another shell:
+$ /nfs/argobots-tascel/argobots-review/examples/dynamic-es/dyn_app 48 1000 localhost 1234 
+
+4)in another shell:
+$ source /nfs/beacon_inst/env.sh
+$ arbitrary_pub BEACON_BROADCAST "message type=2 ; node=frontend ; target watts=190”
+
+
+sdasd
+
