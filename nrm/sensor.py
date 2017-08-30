@@ -33,6 +33,6 @@ class SensorManager:
     def do_update(self):
         rapl_data = self.rapl.sample(accflag=True)
         print(repr(rapl_data))
-        hwmon_data = self.coretemp.sample_and_json()
+        hwmon_data = self.coretemp.sample()
         print(repr(hwmon_data))
         return {'total_power': random.randrange(0, 34)}
