@@ -122,6 +122,7 @@ class Daemon(object):
         ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
 
     def do_shutdown(self):
+        self.sensor.stop()
         ioloop.IOLoop.current().stop()
 
     def main(self):
@@ -140,6 +141,7 @@ class Daemon(object):
 
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
+        self.sensor.start()
         self.sensor_state = self.sensor.do_update()
 
         # setup periodic sensor updates

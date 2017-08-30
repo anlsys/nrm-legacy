@@ -20,6 +20,6 @@ setup(
     ],
 
     packages=find_packages(),
-    install_requires=['six', 'pyzmq', 'tornado'],
+    install_requires=['six', 'pyzmq', 'tornado', 'numpy'],
     scripts=['bin/daemon', 'bin/client']
 )
