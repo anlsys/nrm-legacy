@@ -6,6 +6,7 @@ import re
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
+import sensor
 
 application_fsm_table = {'stable': {'i': 's_ask_i', 'd': 's_ask_d'},
                          's_ask_i': {'done': 'stable', 'max': 'max'},
@@ -70,7 +71,6 @@ class Daemon(object):
         self.applications = {}
         self.buf = ''
         self.logger = logging.getLogger(__name__)
-        self.current = 1
         self.target = 1
 
     def do_application_receive(self, parts):
@@ -97,19 +97,20 @@ class Daemon(object):
                                      application.state)
 
     def do_sensor(self):
-        self.current = random.randrange(0, 34)
-        self.logger.info("current measure: " + str(self.current))
+        self.sensor_state = self.sensor.do_update()
+        self.logger.info("current state: %r" % self.sensor_state)
 
     def do_control(self):
+        total_power = self.sensor_state['total_power']
         self.target = random.randrange(0, 34)
         self.logger.info("target measure: " + str(self.target))
 
         for identity, application in self.applications.iteritems():
-            if self.current < self.target:
+            if total_power < self.target:
                 if 'i' in application.get_allowed_requests():
                     self.stream.send_multipart([identity, 'i'])
                     application.do_transition('i')
-            elif self.current > self.target:
+            elif total_power > self.target:
                 if 'd' in application.get_allowed_requests():
                     self.stream.send_multipart([identity, 'd'])
                     application.do_transition('d')
@@ -137,8 +138,13 @@ class Daemon(object):
         self.stream = zmqstream.ZMQStream(socket)
         self.stream.on_recv(self.do_application_receive)
 
-        self.sensor = ioloop.PeriodicCallback(self.do_sensor, 1000)
-        self.sensor.start()
+        # create sensor manager and make first measurement
+        self.sensor = sensor.SensorManager()
+        self.sensor_state = self.sensor.do_update()
+
+        # setup periodic sensor updates
+        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, 1000)
+        self.sensor_cb.start()
 
         self.control = ioloop.PeriodicCallback(self.do_control, 1000)
         self.control.start()
