@@ -188,7 +188,7 @@ class rapl_reader:
         e = self.read_energy_acc()
         self.stop_time = time.time()
 
-    def sample_and_json(self, label = "", accflag = False, node = ""):
+    def sample(self, accflag=False):
         if not self.initialized():
             return
 
@@ -200,55 +200,31 @@ class rapl_reader:
             if k != 'time':
                 if accflag:
                     self.totalenergy[k] += de[k]
-                self.lastpower[k] = de[k]/de['time']/1000.0/1000.0;
+                self.lastpower[k] = de[k]/de['time']/1000.0/1000.0
         self.prev_e = e
 
-        # constructing a json output
-        s  = '{"sample":"energy","time":%.3f' % (e['time'])
-        if len(node) > 0:
-            s += ',"node":"%s"' % node
-        if len(label) > 0:
-            s += ',"label":"%s"' % label
-        s += ',"energy":{'
-        firstitem = True
+        ret = dict()
+        ret['energy'] = dict()
         for k in sorted(e.keys()):
             if k != 'time':
-                if firstitem:
-                    firstitem = False
-                else:
-                    s+=','
-                s += '"%s":%d' % (self.shortenkey(k), e[k])
-        s += '},'
-        s += '"power":{'
+                ret['energy'][self.shortenkey(k)] = e[k]
 
+        ret['power'] = dict()
         totalpower = 0.0
-        firstitem = True
         for k in sorted(self.lastpower.keys()):
             if k != 'time':
-                if firstitem:
-                    firstitem = False
-                else:
-                    s+=','
-                s += '"%s":%.1f' % (self.shortenkey(k), self.lastpower[k])
+                ret['power'][self.shortenkey(k)] = self.lastpower[k]
                 # this is a bit ad hoc way to calculate the total. needs to be fixed later
                 if k.find("core") == -1:
                     totalpower += self.lastpower[k]
-        s += ',"total":%.1f' % (totalpower)
-        s += '},'
+        ret['power']['total'] = totalpower
 
-        s += '"powercap":{'
+        ret['powercap'] = dict()
         rlimit = self.readpowerlimit()
-        firstitem = True
         for k in sorted(rlimit.keys()):
-            if firstitem:
-                firstitem = False
-            else:
-                s+=','
-            s += '"%s":%.1f' % (self.shortenkey(k), rlimit[k])
-        s += '}'
+            ret['powercap'][self.shortenkey(k)] = rlimit[k]
 
-        s += '}'
-        return s
+        return ret
 
     def total_energy_json(self):
         if not self.initialized():
@@ -263,83 +239,3 @@ class rapl_reader:
                 s += ',"%s":%d' % (self.shortenkey(k), e[k])
         s += '}'
         return s
-
-
-def usage():
-    print 'clr_rapl.py [options]'
-    print ''
-    print '--show:   show the current setting'
-    print '--limitp: set the limit to all packages'
-    print ''
-    print 'If no option is specified, run the test pattern.'
-    print ''
-
-def setlimit(newval):
-    pl = rr.readpowerlimit()
-    for k in sorted(pl.keys()):
-        if re.findall('package-[0-9]$', k):
-            fn = rr.dirs[k] + '/enabled'
-            f = open(fn, 'w')
-            f.write('1')
-            f.close()
-
-            fn = rr.dirs[k] + '/constraint_0_power_limit_uw'
-            uw = newval * 1e6
-            try:
-                f = open(fn, 'w')
-            except:
-                print 'Failed to update:', fn
-                return
-            f.write('%d' % uw)
-            f.close()
-            
-
-def reportlimit():
-    pl = rr.readpowerlimit()
-    for k in sorted(pl.keys()):
-        if pl[k] > 0.0:
-            print k.replace('package-','p'), pl[k]
-
-
-if __name__ == '__main__':
-    rr = rapl_reader()
-
-    if not rr.initialized():
-        print 'Error: No intel rapl sysfs found'
-        sys.exit(1)
-
-    shortopt = "h"
-    longopt = ['show', 'limitp=']
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 
-                                   shortopt, longopt)
-
-    except getopt.GetoptError, err:
-        print err
-        usage()
-        sys.exit(1)
-
-    for o, a in opts:
-        if o in ('-h'):
-            usage()
-            sys.exit(0)
-        elif o in ("--show"):
-            reportlimit()
-            sys.exit(0)
-        elif o in ("--limitp"):
-            setlimit(float(a))
-            reportlimit()
-            sys.exit(0)
-
-    rr.start_energy_counter()
-    for i in range(0,3):
-        time.sleep(1)
-        s = rr.sample_and_json(accflag=True)
-        print s
-    rr.stop_energy_counter()
-    s = rr.total_energy_json()
-    print s
-
-
-    sys.exit(0)
-

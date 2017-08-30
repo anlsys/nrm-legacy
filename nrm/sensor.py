@@ -31,7 +31,7 @@ class SensorManager:
         self.rapl.stop_energy_counter()
 
     def do_update(self):
-        rapl_data = self.rapl.sample_and_json(accflag=True)
+        rapl_data = self.rapl.sample(accflag=True)
         print(repr(rapl_data))
         hwmon_data = self.coretemp.sample_and_json()
         print(repr(hwmon_data))
