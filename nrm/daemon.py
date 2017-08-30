@@ -97,11 +97,11 @@ class Daemon(object):
                                      application.state)
 
     def do_sensor(self):
-        self.sensor_state = self.sensor.do_update()
-        self.logger.info("current state: %r" % self.sensor_state)
+        self.machine_info = self.sensor.do_update()
+        self.logger.info("current state: %r" % self.machine_info)
 
     def do_control(self):
-        total_power = self.sensor_state['total_power']
+        total_power = self.machine_info['energy']['power']['total']
         self.target = random.randrange(0, 34)
         self.logger.info("target measure: " + str(self.target))
 
@@ -142,7 +142,7 @@ class Daemon(object):
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
         self.sensor.start()
-        self.sensor_state = self.sensor.do_update()
+        self.machine_info = self.sensor.do_update()
 
         # setup periodic sensor updates
         self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, 1000)

@@ -6,7 +6,6 @@
     This module should be the only one interfacing with coolr.
 """
 from __future__ import print_function
-import random
 import coolr
 import coolr.clr_rapl
 import coolr.clr_hwmon
@@ -31,8 +30,7 @@ class SensorManager:
         self.rapl.stop_energy_counter()
 
     def do_update(self):
-        rapl_data = self.rapl.sample(accflag=True)
-        print(repr(rapl_data))
-        hwmon_data = self.coretemp.sample()
-        print(repr(hwmon_data))
-        return {'total_power': random.randrange(0, 34)}
+        machine_info = dict()
+        machine_info['energy'] = self.rapl.sample(accflag=True)
+        machine_info['temperature'] = self.coretemp.sample()
+        return machine_info
