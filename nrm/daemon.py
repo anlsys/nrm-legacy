@@ -102,6 +102,11 @@ class Daemon(object):
 
     def do_control(self):
         total_power = self.machine_info['energy']['power']['total']
+
+		# Publish the power values so that GRM can pick it up
+        self.nrm_publish_sock.send("%f" % (total_power))
+        self.logger.info("Sending power values: " + str(total_power))
+
         self.target = random.randrange(0, 34)
         self.logger.info("target measure: " + str(self.target))
 
@@ -126,16 +131,29 @@ class Daemon(object):
         ioloop.IOLoop.current().stop()
 
     def main(self):
-        # read config
+        # read config for the port numbers 
         bind_port = 1234
+		# NRM publish port is the port to which NRM publishes node power info
+        nrm_publish_port = 2345
+		# GRM publish port is the port to which GRM publishes the new power allocation
+        grm_publish_port = 3456
+
         bind_address = '*'
 
         # setup application listening socket
         context = zmq.Context()
         socket = context.socket(zmq.STREAM)
+        self.nrm_publish_sock = context.socket(zmq.PUB)
+
         bind_param = "tcp://%s:%d" % (bind_address, bind_port)
+        nrm_bind_param = "tcp://%s:%d" % (bind_address, nrm_publish_port)
+
         socket.bind(bind_param)
+        self.nrm_publish_sock.bind(nrm_bind_param)
+
         self.logger.info("socket bound to: " + bind_param)
+        self.logger.info("NRM publish socket bound to: " + nrm_bind_param)
+
         self.stream = zmqstream.ZMQStream(socket)
         self.stream.on_recv(self.do_application_receive)
 
