@@ -71,7 +71,7 @@ class Daemon(object):
         self.applications = {}
         self.buf = ''
         self.logger = logging.getLogger(__name__)
-        self.target = 1
+        self.target = 1.0
 
     def do_application_receive(self, parts):
         self.logger.info("receiving application stream: " + repr(parts))
@@ -104,10 +104,14 @@ class Daemon(object):
         total_power = self.machine_info['energy']['power']['total']
 
 		# Publish the power values so that GRM can pick it up
-        self.nrm_publish_sock.send("%f" % (total_power))
+        nrm_topic = "23.45"
+        self.nrm_publish_sock.send("%s %s" % (nrm_topic, str(total_power)))
         self.logger.info("Sending power values: " + str(total_power))
 
-        self.target = random.randrange(0, 34)
+		# Subcribe to the topic for new power allocations published by the GRM
+        # self.target = random.randrange(0, 34)
+        string = self.grm_publish_sock.recv()
+        topic, self.target = string.split()
         self.logger.info("target measure: " + str(self.target))
 
         for identity, application in self.applications.iteritems():
@@ -144,15 +148,21 @@ class Daemon(object):
         context = zmq.Context()
         socket = context.socket(zmq.STREAM)
         self.nrm_publish_sock = context.socket(zmq.PUB)
+        self.grm_publish_sock = context.socket(zmq.SUB)
 
         bind_param = "tcp://%s:%d" % (bind_address, bind_port)
         nrm_bind_param = "tcp://%s:%d" % (bind_address, nrm_publish_port)
+        grm_bind_param = "tcp://localhost:%d" % (grm_publish_port)
 
         socket.bind(bind_param)
         self.nrm_publish_sock.bind(nrm_bind_param)
+        self.grm_publish_sock.connect(grm_bind_param)
+        grm_filter = "34.56 "
+        self.grm_publish_sock.setsockopt(zmq.SUBSCRIBE, grm_filter)
 
         self.logger.info("socket bound to: " + bind_param)
         self.logger.info("NRM publish socket bound to: " + nrm_bind_param)
+        self.logger.info("GRM publish socket connected to: " + grm_bind_param)
 
         self.stream = zmqstream.ZMQStream(socket)
         self.stream.on_recv(self.do_application_receive)
