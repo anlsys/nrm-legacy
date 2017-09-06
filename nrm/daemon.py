@@ -106,7 +106,7 @@ class Daemon(object):
 		# Publish the power values so that GRM can pick it up
         nrm_topic = "23.45"
         self.nrm_publish_sock.send("%s %s" % (nrm_topic, str(total_power)))
-        self.logger.info("Sending power values: " + str(total_power))
+        self.logger.info("Sending power values: " + "%s %s" % (nrm_topic, str(total_power)))
 
 		# Subcribe to the topic for new power allocations published by the GRM
         # self.target = random.randrange(0, 34)
