@@ -71,7 +71,7 @@ class Daemon(object):
         self.applications = {}
         self.buf = ''
         self.logger = logging.getLogger(__name__)
-        self.target = 1
+        self.target = 1.0
 
     def do_application_receive(self, parts):
         self.logger.info("receiving application stream: " + repr(parts))
@@ -96,23 +96,30 @@ class Daemon(object):
                     self.logger.info("application now in state: " +
                                      application.state)
 
+    def do_upstream_receive(self, msg):
+        self.logger.info("receiving upstream message: %r", msg)
+        self.target = int(msg.split()[1])
+        self.logger.info("target measure: %g", self.target)
+
     def do_sensor(self):
         self.machine_info = self.sensor.do_update()
-        self.logger.info("current state: %r" % self.machine_info)
+        self.logger.info("current state: %r", self.machine_info)
+        total_power = self.machine_info['energy']['power']['total']
+        msg = "23.45 %g" % (total_power)
+        self.upstream_pub.send_string(msg)
+        self.logger.info("Sending power values: %r", msg)
 
     def do_control(self):
         total_power = self.machine_info['energy']['power']['total']
-        self.target = random.randrange(0, 34)
-        self.logger.info("target measure: " + str(self.target))
 
         for identity, application in self.applications.iteritems():
             if total_power < self.target:
                 if 'i' in application.get_allowed_requests():
-                    self.stream.send_multipart([identity, 'i'])
+                    self.downstream.send_multipart([identity, 'i'])
                     application.do_transition('i')
             elif total_power > self.target:
                 if 'd' in application.get_allowed_requests():
-                    self.stream.send_multipart([identity, 'd'])
+                    self.downstream.send_multipart([identity, 'd'])
                     application.do_transition('d')
             else:
                 pass
@@ -126,18 +133,45 @@ class Daemon(object):
         ioloop.IOLoop.current().stop()
 
     def main(self):
-        # read config
+        # Bind port for downstream clients
         bind_port = 1234
+        # Bind address for downstream clients
         bind_address = '*'
+        # PUB port for upstream clients
+        upstream_pub_port = 2345
+        # SUB port for upstream clients
+        upstream_sub_port = 3456
 
         # setup application listening socket
         context = zmq.Context()
-        socket = context.socket(zmq.STREAM)
-        bind_param = "tcp://%s:%d" % (bind_address, bind_port)
-        socket.bind(bind_param)
-        self.logger.info("socket bound to: " + bind_param)
-        self.stream = zmqstream.ZMQStream(socket)
-        self.stream.on_recv(self.do_application_receive)
+        downstream_socket = context.socket(zmq.STREAM)
+        upstream_pub_socket = context.socket(zmq.PUB)
+        upstream_sub_socket = context.socket(zmq.SUB)
+
+        downstream_bind_param = "tcp://%s:%d" % (bind_address, bind_port)
+        upstream_pub_param = "tcp://%s:%d" % (bind_address, upstream_pub_port)
+        upstream_sub_param = "tcp://localhost:%d" % (upstream_sub_port)
+
+        downstream_socket.bind(downstream_bind_param)
+        upstream_pub_socket.bind(upstream_pub_param)
+        upstream_sub_socket.connect(upstream_sub_param)
+        upstream_sub_filter = "34.56 "
+        upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
+
+        self.logger.info("downstream socket bound to: %s",
+                         downstream_bind_param)
+        self.logger.info("upstream pub socket bound to: %s",
+                         upstream_pub_param)
+        self.logger.info("upstream sub socket connected to: %s",
+                         upstream_sub_param)
+
+        # register socket triggers
+        self.downstream = zmqstream.ZMQStream(downstream_socket)
+        self.downstream.on_recv(self.do_application_receive)
+        self.upstream_sub = zmqstream.ZMQStream(upstream_sub_socket)
+        self.upstream_sub.on_recv(self.do_upstream_receive)
+        # create a stream to let ioloop deal with blocking calls on HWM
+        self.upstream_pub = zmqstream.ZMQStream(upstream_pub_socket)
 
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
