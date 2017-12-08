@@ -13,4 +13,6 @@ def sensor_manager():
 def test_sensor_update_returns_valid_data(sensor_manager):
     sensor_manager.start()
     data = sensor_manager.do_update()
-    assert 'total_power' in data
+    assert 'energy' in data
+    assert 'power' in data['energy']
+    assert 'total' in data['energy']['power']
