@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import logging
-import random
 import re
 import signal
 import zmq
@@ -74,7 +73,7 @@ class Daemon(object):
         self.target = 1.0
 
     def do_application_receive(self, parts):
-        self.logger.info("receiving application stream: " + repr(parts))
+        self.logger.info("receiving application stream: %r", parts)
         identity = parts[0]
 
         if len(parts[1]) == 0:
@@ -93,7 +92,7 @@ class Daemon(object):
                 application.append_buffer(parts[1])
                 for m in application.get_messages():
                     application.do_transition(m)
-                    self.logger.info("application now in state: " +
+                    self.logger.info("application now in state: %s",
                                      application.state)
 
     def do_upstream_receive(self, msg):
@@ -123,7 +122,7 @@ class Daemon(object):
                     application.do_transition('d')
             else:
                 pass
-            self.logger.info("application now in state: " + application.state)
+            self.logger.info("application now in state: %s", application.state)
 
     def do_signal(self, signum, frame):
         ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
