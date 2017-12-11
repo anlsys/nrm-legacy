@@ -1,0 +1,104 @@
+#!/usr/bin/env python2
+
+from __future__ import print_function
+import argparse
+import logging
+import uuid
+import signal
+import zmq
+
+
+class CommandLineInterface(object):
+
+    """Implements a command line interface to the NRM."""
+
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def do_signal(self):
+        pass
+
+    def setup(self):
+        # SUB port to the upstream API (connected to its PUB port)
+        upstream_sub_port = 2345
+        # PUB port to the upstream API (connected to its SUB port)
+        upstream_pub_port = 3456
+
+        self.context = zmq.Context()
+        self.upstream_pub_socket = self.context.socket(zmq.PUB)
+        self.upstream_sub_socket = self.context.socket(zmq.SUB)
+
+        upstream_pub_param = "tcp://*:%d" % (upstream_pub_port)
+        upstream_sub_param = "tcp://localhost:%d" % (upstream_sub_port)
+
+        self.upstream_pub_socket.bind(upstream_pub_param)
+        self.upstream_sub_socket.connect(upstream_sub_param)
+        # we want to receive everything for now
+        upstream_sub_filter = ""
+        self.upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
+
+        self.logger.info("upstream pub socket bound to: %s",
+                         upstream_pub_param)
+        self.logger.info("upstream sub socket connected to: %s",
+                         upstream_sub_param)
+
+        # take care of signals
+        signal.signal(signal.SIGINT, self.do_signal)
+
+        # create a uuid for this client instance
+        self.uuid = str(uuid.uuid4())
+        self.logger.info("client uuid: %r", self.uuid)
+
+    def do_run(self, argv):
+        pass
+
+    def do_setpower(self, argv):
+        """ Connect to the NRM and ask to change the power limit.
+
+        The NRM should answer on the pub socket with an acknowledgment."""
+
+        command = "34.56 %g" % argv.level
+        self.upstream_pub_socket.send_string(command)
+
+        # now wait for an answer
+        while(True):
+            msg = self.upstream_sub_socket.recv_string()
+            self.logger.info("new message: %r", msg)
+            fields = msg.split()
+            if fields[0] == "23.45":
+                self.logger.info("new power: %g", float(fields[1]))
+                break
+
+    def main(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-v", "--verbose",
+                            help="verbose logging information",
+                            action='store_true')
+        subparsers = parser.add_subparsers()
+
+        # run container
+        parser_run = subparsers.add_parser("run")
+        parser_run.add_argument("container")
+        parser_run.set_defaults(func=self.do_run)
+
+        # setpowerlimit
+        parser_setpower = subparsers.add_parser("setpower")
+        parser_setpower.add_argument("-f", "--follow",
+                                     help="listen for power changes",
+                                     action='store_true')
+        parser_setpower.add_argument("level",
+                                     help="set new power limit",
+                                     type=float)
+        parser_setpower.set_defaults(func=self.do_setpower)
+        args = parser.parse_args()
+        if args.verbose:
+            self.logger.setLevel(logging.DEBUG)
+
+        self.setup()
+        args.func(args)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    cli = CommandLineInterface()
+    cli.main()

@@ -95,9 +95,9 @@ class Daemon(object):
                     self.logger.info("application now in state: %s",
                                      application.state)
 
-    def do_upstream_receive(self, msg):
-        self.logger.info("receiving upstream message: %r", msg)
-        self.target = int(msg.split()[1])
+    def do_upstream_receive(self, parts):
+        self.logger.info("receiving upstream message: %r", parts)
+        self.target = int(parts[0].split()[1])
         self.logger.info("target measure: %g", self.target)
 
     def do_sensor(self):
