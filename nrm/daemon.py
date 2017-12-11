@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import json
 import logging
 import re
 import signal
@@ -95,18 +96,26 @@ class Daemon(object):
                     self.logger.info("application now in state: %s",
                                      application.state)
 
-    def do_upstream_receive(self, msg):
-        self.logger.info("receiving upstream message: %r", msg)
-        self.target = int(msg.split()[1])
-        self.logger.info("target measure: %g", self.target)
+    def do_upstream_receive(self, parts):
+        self.logger.info("receiving upstream message: %r", parts)
+        if len(parts) != 1:
+            self.logger.error("unexpected msg length, droping it: %r", parts)
+            return
+        msg = json.loads(parts[0])
+        if isinstance(msg, dict) and msg.get('command') == 'setpower':
+            self.target = float(msg['limit'])
+            self.logger.info("new target measure: %g", self.target)
 
     def do_sensor(self):
         self.machine_info = self.sensor.do_update()
         self.logger.info("current state: %r", self.machine_info)
         total_power = self.machine_info['energy']['power']['total']
-        msg = "23.45 %g" % (total_power)
-        self.upstream_pub.send_string(msg)
-        self.logger.info("Sending power values: %r", msg)
+        msg = {'type': 'power',
+               'total': total_power,
+               'limit': self.target
+               }
+        self.upstream_pub.send_json(msg)
+        self.logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
         total_power = self.machine_info['energy']['power']['total']
@@ -154,7 +163,7 @@ class Daemon(object):
         downstream_socket.bind(downstream_bind_param)
         upstream_pub_socket.bind(upstream_pub_param)
         upstream_sub_socket.connect(upstream_sub_param)
-        upstream_sub_filter = "34.56 "
+        upstream_sub_filter = ""
         upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
 
         self.logger.info("downstream socket bound to: %s",
