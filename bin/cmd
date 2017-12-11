@@ -50,7 +50,31 @@ class CommandLineInterface(object):
         self.logger.info("client uuid: %r", self.uuid)
 
     def do_run(self, argv):
-        pass
+        """ Connect to the NRM and ask to spawn a container and run a command
+        in it.
+
+        The NRM should notify us on the pub socket of the container
+        creation."""
+
+        # build the command as a JSON dict containing enough info. We add to
+        # the command a container uuid as a way to make sure that we can make
+        # the command idempotent.
+        containerid = str(uuid.uuid4())
+        command = {'command': 'run',
+                   'manifest': argv.manifest,
+                   'file': argv.command,
+                   'args': argv.args,
+                   'uuid': containerid,
+                   }
+
+        while(True):
+            self.upstream_pub_socket.send_json(command)
+            msg = self.upstream_sub_socket.recv_json()
+            self.logger.info("new message: %r", msg)
+            # ignore other messages
+            if isinstance(msg, dict) and msg.get('type') == 'container':
+                if msg['uuid'] == containerid:
+                    pass
 
     def do_setpower(self, argv):
         """ Connect to the NRM and ask to change the power limit.
@@ -85,7 +109,10 @@ class CommandLineInterface(object):
 
         # run container
         parser_run = subparsers.add_parser("run")
-        parser_run.add_argument("container")
+        parser_run.add_argument("manifest", help="manifest file to apply")
+        parser_run.add_argument("command", help="command to execute")
+        parser_run.add_argument("args", help="command arguments",
+                                nargs=argparse.REMAINDER)
         parser_run.set_defaults(func=self.do_run)
 
         # setpowerlimit

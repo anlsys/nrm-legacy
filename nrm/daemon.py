@@ -99,12 +99,22 @@ class Daemon(object):
     def do_upstream_receive(self, parts):
         self.logger.info("receiving upstream message: %r", parts)
         if len(parts) != 1:
-            self.logger.error("unexpected msg length, droping it: %r", parts)
+            self.logger.error("unexpected msg length, dropping it: %r", parts)
             return
         msg = json.loads(parts[0])
-        if isinstance(msg, dict) and msg.get('command') == 'setpower':
-            self.target = float(msg['limit'])
-            self.logger.info("new target measure: %g", self.target)
+        if isinstance(msg, dict):
+            command = msg.get('command')
+            # TODO: switch to a dispatch dictionary
+            if command is None:
+                self.logger.error("missing command in message: %r", msg)
+                return
+            if command == 'setpower':
+                self.target = float(msg['limit'])
+                self.logger.info("new target measure: %g", self.target)
+            elif command == 'run':
+                self.logger.info("new container required: %r", msg)
+            else:
+                self.logger.error("invalid command: %r", command)
 
     def do_sensor(self):
         self.machine_info = self.sensor.do_update()
