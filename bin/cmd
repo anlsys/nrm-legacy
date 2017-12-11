@@ -57,17 +57,24 @@ class CommandLineInterface(object):
 
         The NRM should answer on the pub socket with an acknowledgment."""
 
-        command = "34.56 %g" % argv.level
-        self.upstream_pub_socket.send_string(command)
+        # build the command as a JSON dict giving enough info. This is an
+        # idempotent command, so we will repeat the command if we don't get a
+        # timely answer.
+        # TODO: check that the level makes a little bit of sense in the first
+        # place
+        command = {'command': 'setpower',
+                   'limit': argv.limit,
+                   }
 
-        # now wait for an answer
         while(True):
-            msg = self.upstream_sub_socket.recv_string()
+            self.upstream_pub_socket.send_json(command)
+            msg = self.upstream_sub_socket.recv_json()
             self.logger.info("new message: %r", msg)
-            fields = msg.split()
-            if fields[0] == "23.45":
-                self.logger.info("new power: %g", float(fields[1]))
-                break
+            # ignore other messages
+            if isinstance(msg, dict) and msg.get('type') == 'power':
+                if msg['limit'] == argv.limit:
+                    self.logger.info("command received by the daemon")
+                    break
 
     def main(self):
         parser = argparse.ArgumentParser()
@@ -86,7 +93,7 @@ class CommandLineInterface(object):
         parser_setpower.add_argument("-f", "--follow",
                                      help="listen for power changes",
                                      action='store_true')
-        parser_setpower.add_argument("level",
+        parser_setpower.add_argument("limit",
                                      help="set new power limit",
                                      type=float)
         parser_setpower.set_defaults(func=self.do_setpower)
