@@ -1,12 +1,15 @@
 from __future__ import print_function
 
+import containers
 import json
 import logging
+import os
 import re
+import sensor
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
-import sensor
+
 
 application_fsm_table = {'stable': {'i': 's_ask_i', 'd': 's_ask_d'},
                          's_ask_i': {'done': 'stable', 'max': 'max'},
@@ -113,6 +116,22 @@ class Daemon(object):
                 self.logger.info("new target measure: %g", self.target)
             elif command == 'run':
                 self.logger.info("new container required: %r", msg)
+                pid = self.container_manager.create(msg)
+                if pid > 0:
+                    self.children[pid] = msg['uuid']
+                    # TODO: obviously we need to send more info than that
+                    update = {'type': 'container',
+                              'uuid': msg['uuid'],
+                              'errno': 0,
+                              'pid': pid,
+                              }
+                    self.upstream_pub.send_json(update)
+                else:
+                    update = {'type': 'container',
+                              'uuid': msg['uuid'],
+                              'errno': pid,
+                              }
+                    self.upstream_pub.send_json(update)
             else:
                 self.logger.error("invalid command: %r", command)
 
@@ -144,7 +163,37 @@ class Daemon(object):
             self.logger.info("application now in state: %s", application.state)
 
     def do_signal(self, signum, frame):
-        ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
+        if signum == signal.SIGINT:
+            ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
+        elif signum == signal.SIGCHLD:
+            ioloop.IOLoop.current().add_callback_from_signal(self.do_children)
+        else:
+            self.logger.error("wrong signal: %d", signum)
+
+    def do_children(self):
+        # find out if children have terminated
+        while True:
+            try:
+                ret = os.wait3(os.WNOHANG)
+                if ret == (0, 0):
+                    break
+            except OSError:
+                break
+
+            pid, status = ret
+            self.logger.info("child update: %d, %r", pid, status)
+            # check if this is an exit
+            if os.WIFEXITED(status):
+                # TODO: update container tracking
+                msg = {'type': 'container',
+                       'event': 'exit',
+                       'status': status,
+                       'uuid': None,
+                       }
+                self.upstream_pub.send_json(msg)
+            else:
+                # ignore on purpose
+                pass
 
     def do_shutdown(self):
         self.sensor.stop()
@@ -191,6 +240,9 @@ class Daemon(object):
         # create a stream to let ioloop deal with blocking calls on HWM
         self.upstream_pub = zmqstream.ZMQStream(upstream_pub_socket)
 
+        # create container manager
+        self.container_manager = containers.ContainerManager()
+
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
         self.sensor.start()
@@ -205,6 +257,7 @@ class Daemon(object):
 
         # take care of signals
         signal.signal(signal.SIGINT, self.do_signal)
+        signal.signal(signal.SIGCHLD, self.do_signal)
 
         ioloop.IOLoop.current().start()
 

@@ -15,8 +15,9 @@ class CommandLineInterface(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def do_signal(self):
-        pass
+    def do_signal(self, signum, stackframe):
+        self.logger.info("received signal %d, exiting", signum)
+        exit(1)
 
     def setup(self):
         # SUB port to the upstream API (connected to its PUB port)
@@ -74,7 +75,8 @@ class CommandLineInterface(object):
             # ignore other messages
             if isinstance(msg, dict) and msg.get('type') == 'container':
                 if msg['uuid'] == containerid:
-                    pass
+                    self.logger.info("container response: %r", msg)
+                    break
 
     def do_setpower(self, argv):
         """ Connect to the NRM and ask to change the power limit.
