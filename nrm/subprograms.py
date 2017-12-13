@@ -2,6 +2,7 @@
 import subprocess
 import collections
 import logging
+import xml.etree.ElementTree
 
 resources = collections.namedtuple("Resources", ["cpus", "mems"])
 
@@ -136,23 +137,22 @@ class HwlocClient(object):
 
     def info(self):
         """Return list of all cpus and mems."""
-        cmd = self.prefix + "-info"
-        args = [cmd, '--whole-system']
+        cmd = self.prefix + "-ls"
+        args = [cmd, '--whole-system', '--output-format', 'xml']
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         logpopen(p, args, stdout, stderr)
-        lines = stdout.splitlines()
+        xmlroot = xml.etree.ElementTree.fromstring(stdout)
         ret = resources([], [])
-        for l in lines:
-            numa = l.find('NUMANode')
-            pu = l.find('PU')
-            if numa != -1:
-                fields = l[:numa].split()
-                ret.mems.extend(range(int(fields[-1])))
-            if pu != -1:
-                fields = l[:pu].split()
-                ret.cpus.extend(range(int(fields[-1])))
+        for obj in xmlroot.iter('object'):
+            if obj.attrib['type'] == "NUMANode":
+                ret.mems.append(int(obj.attrib['os_index']))
+            if obj.attrib['type'] == "PU":
+                ret.cpus.append(int(obj.attrib['os_index']))
+        # if there's only one memory node, hwloc doesn't list it
+        if not ret.mems:
+            ret.mems.append(0)
         return ret
 
     def all2fake(self, resources):

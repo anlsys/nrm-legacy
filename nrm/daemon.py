@@ -1,6 +1,7 @@
 from __future__ import print_function
 
-import containers
+from containers import ContainerManager
+from resources import ResourceManager
 import json
 import logging
 import os
@@ -72,6 +73,7 @@ class Application(object):
 class Daemon(object):
     def __init__(self):
         self.applications = {}
+        self.containerpids = {}
         self.buf = ''
         self.logger = logging.getLogger(__name__)
         self.target = 1.0
@@ -118,7 +120,7 @@ class Daemon(object):
                 self.logger.info("new container required: %r", msg)
                 pid = self.container_manager.create(msg)
                 if pid > 0:
-                    self.children[pid] = msg['uuid']
+                    self.containerpids[pid] = msg['uuid']
                     # TODO: obviously we need to send more info than that
                     update = {'type': 'container',
                               'uuid': msg['uuid'],
@@ -174,25 +176,27 @@ class Daemon(object):
         # find out if children have terminated
         while True:
             try:
-                ret = os.wait3(os.WNOHANG)
-                if ret == (0, 0):
+                pid, status, rusage = os.wait3(os.WNOHANG)
+                if pid == 0 and status == 0:
                     break
             except OSError:
                 break
 
-            pid, status = ret
-            self.logger.info("child update: %d, %r", pid, status)
-            # check if this is an exit
-            if os.WIFEXITED(status):
-                # TODO: update container tracking
-                msg = {'type': 'container',
-                       'event': 'exit',
-                       'status': status,
-                       'uuid': None,
-                       }
-                self.upstream_pub.send_json(msg)
+            self.logger.info("child update %d: %r", pid, status)
+            # check if its a pid we care about
+            if pid in self.containerpids:
+                # check if this is an exit
+                if os.WIFEXITED(status):
+                    uuid = self.containerpids[pid]
+                    self.container_manager.delete(uuid)
+                    msg = {'type': 'container',
+                           'event': 'exit',
+                           'status': status,
+                           'uuid': None,
+                           }
+                    self.upstream_pub.send_json(msg)
             else:
-                # ignore on purpose
+                self.logger.debug("child update ignored")
                 pass
 
     def do_shutdown(self):
@@ -240,8 +244,9 @@ class Daemon(object):
         # create a stream to let ioloop deal with blocking calls on HWM
         self.upstream_pub = zmqstream.ZMQStream(upstream_pub_socket)
 
-        # create container manager
-        self.container_manager = containers.ContainerManager()
+        # create resource and container manager
+        self.resource_manager = ResourceManager()
+        self.container_manager = ContainerManager(self.resource_manager)
 
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
