@@ -92,3 +92,9 @@ class ContainerManager(object):
         c = self.containers[uuid]
         del self.containers[uuid]
         del self.pids[c.pid]
+
+    def list(self):
+        """List the containers in the system."""
+        fields = ['uuid', 'pid']
+        ret = [c._asdict() for c in self.containers.values()]
+        return [{k: d[k] for k in fields} for d in ret]

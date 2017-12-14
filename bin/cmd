@@ -78,6 +78,26 @@ class CommandLineInterface(object):
                     self.logger.info("container response: %r", msg)
                     break
 
+    def do_list(self, argv):
+        """Connect to the NRM and ask to list the containers present on the
+        system.
+
+        The NRM should respond to us on the pub socket with one message listing
+        all containers."""
+
+        command = {'command': 'list',
+                   }
+
+        while(True):
+            self.upstream_pub_socket.send_json(command)
+            msg = self.upstream_sub_socket.recv_json()
+            self.logger.info("new message: %r", msg)
+            # ignore other messages
+            if isinstance(msg, dict) and msg.get('type') == 'container':
+                if msg['event'] == 'list':
+                    self.logger.info("list response: %r", msg)
+                    break
+
     def do_setpower(self, argv):
         """ Connect to the NRM and ask to change the power limit.
 
@@ -117,6 +137,10 @@ class CommandLineInterface(object):
                                 nargs=argparse.REMAINDER)
         parser_run.set_defaults(func=self.do_run)
 
+        # list containers
+        parser_list = subparsers.add_parser("list")
+        parser_list.set_defaults(func=self.do_list)
+
         # setpowerlimit
         parser_setpower = subparsers.add_parser("setpower")
         parser_setpower.add_argument("-f", "--follow",
@@ -126,6 +150,7 @@ class CommandLineInterface(object):
                                      help="set new power limit",
                                      type=float)
         parser_setpower.set_defaults(func=self.do_setpower)
+
         args = parser.parse_args()
         if args.verbose:
             self.logger.setLevel(logging.DEBUG)

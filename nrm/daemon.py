@@ -134,6 +134,14 @@ class Daemon(object):
                               'errno': pid,
                               }
                     self.upstream_pub.send_json(update)
+            elif command == 'list':
+                self.logger.info("asked for container list: %r", msg)
+                response = self.container_manager.list()
+                update = {'type': 'container',
+                          'event': 'list',
+                          'payload': response,
+                          }
+                self.upstream_pub.send_json(update)
             else:
                 self.logger.error("invalid command: %r", command)
 
