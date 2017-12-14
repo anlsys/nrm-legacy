@@ -1,0 +1,23 @@
+{
+	"acKind": "ImageManifest",
+	"acVersion": "0.6.0",
+	"name": "test",
+	"app": {
+		"isolators": [
+			{
+				"name": "argo/scheduler",
+				"value": {
+					"policy": "SCHED_OTHER",
+					"priority": "0"
+				}
+			},
+			{
+				"name": "argo/container",
+				"value": {
+					"cpus": "4",
+					"mems": "1"
+				}
+			}
+		]
+	}
+}
