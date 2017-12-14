@@ -3,6 +3,8 @@ from __future__ import print_function
 import logging
 from subprograms import HwlocClient, resources
 
+logger = logging.getLogger('nrm')
+
 
 class ResourceManager(object):
 
@@ -10,13 +12,13 @@ class ResourceManager(object):
     the scheduling of new containers according to partitioning rules."""
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
         self.hwloc = HwlocClient()
 
         # query the node topo, keep track of the critical resources
         self.allresources = self.hwloc.info()
-        self.logger.debug("resource info: %r", self.allresources)
+        logger.debug("resource info: %r", self.allresources)
         self.available = self.allresources
+        self.allocations = {}
 
     def schedule(self, uuid, request):
         """Schedule a resource request on the available resources.
@@ -27,43 +29,37 @@ class ResourceManager(object):
         #  - memories exclusive if more than one left
         if len(self.available.cpus) >= request.cpus:
             retcpus = self.available.cpus[:request.cpus]
-            availcpus = self.available.cpus[request.cpus:]
         else:
             retcpus = []
-            availcpus = self.available.cpus
         if len(self.available.mems) > 1:
             retmems = self.available.mems[:request.mems]
-            availmems = self.available.mems[request.mems:]
         else:
             retmems = self.available.mems
-            availmems = self.available.mems
-        self.available = resources(availcpus, availmems)
-        return resources(retcpus, retmems)
+        ret = resources(retcpus, retmems)
+        # make sure we don't remember an error
+        if ret.cpus:
+            self.update(uuid, ret)
+        return ret
 
-    def remove(self, uuid):
-        """Free the resources associated with request uuid."""
-        pass
+    def update(self, uuid, allocation=resources([], [])):
+        """Update resource tracking according to new allocation.
 
-#    def oldcode(self):
-#        numcpus = int(manifest.app.isolators.container.cpus.value)
-#
-#        allresources = hwloc.info()
-#        self.logger.debug("resource info: %r", allresources)
-#        ncontainers = len(allresources.cpus) // numcpus
-#        self.logger.debug("will support %s containers", ncontainers)
-#        cur = nodeos.getavailable()
-#        self.logger.debug("%r are available", cur)
-#        sets = hwloc.distrib(ncontainers, restrict=cur, fake=allresources)
-#        self.logger.info("asking for %s cores", numcpus)
-#        self.logger.debug("will search in one of these: %r", sets)
-#        # find a free set
-#        avail = set(cur.cpus)
-#        for s in sets:
-#            cpuset = set(s.cpus)
-#            if cpuset.issubset(avail):
-#                alloc = s
-#                break
-#        else:
-#            self.logger.error("no exclusive cpuset found among %r", avail)
-#            return -2
-#
+        The new allocation is saved, and available resources updated."""
+        added = {}
+        freed = {}
+        prev = self.allocations.get(uuid, resources([], []))
+        for attr, val in prev._asdict().items():
+            added[attr] = set(getattr(allocation, attr)) - set(val)
+            freed[attr] = set(val) - set(getattr(allocation, attr))
+        if allocation != resources([], []):
+            self.allocations[uuid] = allocation
+            logger.info("updated allocation for %r: %r", uuid,
+                        self.available)
+        else:
+            del self.allocations[uuid]
+            logger.info("deleted allocation for %r", uuid)
+        new = {}
+        for attr, val in self.available._asdict().items():
+            new[attr] = list(set(val) - set(added[attr]) | set(freed[attr]))
+        self.available = resources(**new)
+        logger.info("updated available resources: %r", self.available)

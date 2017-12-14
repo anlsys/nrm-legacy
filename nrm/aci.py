@@ -3,7 +3,7 @@ import collections
 import logging
 import json
 
-logger = logging.getLogger('argus')
+logger = logging.getLogger('nrm')
 spec = collections.namedtuple('Field', ['cls', 'required'])
 
 
@@ -57,7 +57,7 @@ class Scheduler(SpecField):
     classes = ['SCHED_FIFO', 'SCHED_HPC', 'SCHED_OTHER']
 
     fields = {"policy": spec(unicode, True),
-              "priority": spec(unicode, False)
+              "priority": spec(unicode, False),
               }
 
     def __init__(self):
@@ -180,7 +180,7 @@ class ImageManifest(SpecField):
     fields = {"acKind": spec(unicode, True),
               "acVersion": spec(unicode, True),
               "name": spec(unicode, True),
-              "app": spec(App, True)
+              "app": spec(App, True),
               }
 
     def __init__(self):

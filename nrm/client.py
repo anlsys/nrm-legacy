@@ -6,10 +6,11 @@ import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
 
+logger = logging.getLogger('nrm-client')
+
 
 class Client(object):
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
         self.buf = ''
         self.nt = 16
         self.max = 32
@@ -34,7 +35,7 @@ class Client(object):
         return
 
     def do_receive(self, parts):
-        self.logger.info("receive stream: " + repr(parts))
+        logger.info("receive stream: " + repr(parts))
 
         if len(parts[1]) == 0:
             if self.server:
@@ -46,7 +47,7 @@ class Client(object):
 
         self.buf = self.buf + parts[1]
         for m in self.get_server_message():
-            self.logger.info(m)
+            logger.info(m)
             if m == 'd':
                 if self.nt == 1:
                     ret = "min"
@@ -68,7 +69,7 @@ class Client(object):
             self.stream.send(ret)
 
     def do_signal(self, signum, frame):
-        self.logger.critical("received signal: " + repr(signum))
+        logger.critical("received signal: " + repr(signum))
         self.setup_shutdown()
 
     def do_shutdown(self):
@@ -88,7 +89,7 @@ class Client(object):
 
         # deal with logging
         if args.verbose:
-            self.logger.setLevel(logging.DEBUG)
+            logger.setLevel(logging.DEBUG)
         self.nt = args.threads
         self.max = args.maxthreads
 
@@ -101,7 +102,7 @@ class Client(object):
         context = zmq.Context()
         socket = context.socket(zmq.STREAM)
         socket.connect(connect_param)
-        self.logger.info("connected to: " + connect_param)
+        logger.info("connected to: " + connect_param)
 
         self.stream = zmqstream.ZMQStream(socket)
         self.stream.on_recv(self.do_receive)

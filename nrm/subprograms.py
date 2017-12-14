@@ -4,15 +4,16 @@ import collections
 import logging
 import xml.etree.ElementTree
 
+logger = logging.getLogger('nrm')
 resources = collections.namedtuple("Resources", ["cpus", "mems"])
 
 
 def logpopen(p, args, stdout, stderr):
     """log popen cmd."""
-    logging.debug("popen cmd: %r", args)
-    logging.debug("popen return code: %s", p.returncode)
-    logging.debug("popen stdout: %r", stdout)
-    logging.debug("popen, stderr: %r", stderr)
+    logger.debug("popen cmd: %r", args)
+    logger.debug("popen return code: %s", p.returncode)
+    logger.debug("popen stdout: %r", stdout)
+    logger.debug("popen, stderr: %r", stderr)
 
 
 def bitmask2list(mask):
