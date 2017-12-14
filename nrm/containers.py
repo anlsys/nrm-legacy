@@ -4,8 +4,10 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 import os
+import signal
 from subprograms import ChrtClient, NodeOSClient, resources
 import sys
+
 
 Container = namedtuple('Container', ['uuid', 'manifest', 'pid'])
 
@@ -92,3 +94,19 @@ class ContainerManager(object):
         c = self.containers[uuid]
         del self.containers[uuid]
         del self.pids[c.pid]
+
+    def kill(self, uuid):
+        """Kill all the processes of a container."""
+        if uuid in self.containers:
+            c = self.containers[uuid]
+            self.logger.debug("killing %r:", c)
+            try:
+                os.kill(c.pid, signal.SIGKILL)
+            except OSError:
+                pass
+
+    def list(self):
+        """List the containers in the system."""
+        fields = ['uuid', 'pid']
+        ret = [c._asdict() for c in self.containers.values()]
+        return [{k: d[k] for k in fields} for d in ret]
