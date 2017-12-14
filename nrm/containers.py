@@ -7,6 +7,7 @@ import os
 from subprograms import ChrtClient, NodeOSClient, resources
 import sys
 
+logger = logging.getLogger('nrm')
 Container = namedtuple('Container', ['uuid', 'manifest', 'pid'])
 
 
@@ -18,7 +19,6 @@ class ContainerManager(object):
     def __init__(self, rm):
         self.containers = dict()
         self.pids = dict()
-        self.logger = logging.getLogger(__name__)
         self.resourcemanager = rm
         self.nodeos = NodeOSClient()
         self.chrt = ChrtClient()
@@ -30,19 +30,19 @@ class ContainerManager(object):
         manifestfile = request['manifest']
         command = request['file']
         args = request['args']
-        self.logger.info("run: manifest file: %s", manifestfile)
-        self.logger.info("run: command:       %s", command)
-        self.logger.info("run: args:          %r", args)
+        logger.info("run: manifest file: %s", manifestfile)
+        logger.info("run: command:       %s", command)
+        logger.info("run: args:          %r", args)
         manifest = ImageManifest()
         if not manifest.load(manifestfile):
-            self.logger.error("Manifest is invalid")
+            logger.error("Manifest is invalid")
             return -1
 
         # ask the resource manager for resources
         req = resources(int(manifest.app.isolators.container.cpus.value),
                         int(manifest.app.isolators.container.mems.value))
         allocation = self.resourcemanager.schedule(request['uuid'], req)
-        self.logger.info("run: allocation: %r", allocation)
+        logger.info("run: allocation: %r", allocation)
 
         # build context to execute
         environ = os.environ
@@ -51,21 +51,21 @@ class ContainerManager(object):
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
         environ['container'] = 'argo'
-        self.logger.info("run: environ: %r", environ)
+        logger.info("run: environ: %r", environ)
 
         # create container
         container_name = request['uuid']
-        self.logger.info("creating container %s", container_name)
+        logger.info("creating container %s", container_name)
         self.nodeos.create(container_name, allocation)
-        self.logger.info("created container %s", container_name)
+        logger.info("created container %s", container_name)
 
         newpid = os.fork()
-        self.logger.info("forked: new pid: %s", newpid)
+        logger.info("forked: new pid: %s", newpid)
         if newpid == 0:
             # move myself to that container
             mypid = os.getpid()
             self.nodeos.attach(container_name, mypid)
-            self.logger.info("child: attached to container %s", container_name)
+            logger.info("child: attached to container %s", container_name)
 
             # run my command
             if hasattr(manifest.app.isolators, 'scheduler'):
@@ -76,7 +76,7 @@ class ContainerManager(object):
 
             argv.append(command)
             argv.extend(args)
-            self.logger.debug("execvpe %r", argv)
+            logger.debug("execvpe %r", argv)
             os.execvpe(argv[0], argv, environ)
             # should never happen
             sys.exit(1)

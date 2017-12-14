@@ -3,7 +3,7 @@ import collections
 import logging
 import json
 
-logger = logging.getLogger('argus')
+logger = logging.getLogger('nrm')
 spec = collections.namedtuple('Field', ['cls', 'required'])
 
 

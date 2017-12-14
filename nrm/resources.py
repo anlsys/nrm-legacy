@@ -3,6 +3,8 @@ from __future__ import print_function
 import logging
 from subprograms import HwlocClient, resources
 
+logger = logging.getLogger('nrm')
+
 
 class ResourceManager(object):
 
@@ -10,12 +12,11 @@ class ResourceManager(object):
     the scheduling of new containers according to partitioning rules."""
 
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
         self.hwloc = HwlocClient()
 
         # query the node topo, keep track of the critical resources
         self.allresources = self.hwloc.info()
-        self.logger.debug("resource info: %r", self.allresources)
+        logger.debug("resource info: %r", self.allresources)
         self.available = self.allresources
         self.allocations = {}
 
@@ -52,13 +53,13 @@ class ResourceManager(object):
             freed[attr] = set(val) - set(getattr(allocation, attr))
         if allocation != resources([], []):
             self.allocations[uuid] = allocation
-            self.logger.info("updated allocation for %r: %r", uuid,
-                             self.available)
+            logger.info("updated allocation for %r: %r", uuid,
+                        self.available)
         else:
             del self.allocations[uuid]
-            self.logger.info("deleted allocation for %r", uuid)
+            logger.info("deleted allocation for %r", uuid)
         new = {}
         for attr, val in self.available._asdict().items():
             new[attr] = list(set(val) - set(added[attr]) | set(freed[attr]))
         self.available = resources(**new)
-        self.logger.info("updated available resources: %r", self.available)
+        logger.info("updated available resources: %r", self.available)

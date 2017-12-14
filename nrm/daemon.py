@@ -21,6 +21,8 @@ application_fsm_table = {'stable': {'i': 's_ask_i', 'd': 's_ask_d'},
                          'min_ask_i': {'done': 'stable', 'max': 'nop'},
                          'nop': {}}
 
+logger = logging.getLogger('nrm')
+
 
 class Application(object):
     def __init__(self, identity):
@@ -75,20 +77,19 @@ class Daemon(object):
         self.applications = {}
         self.containerpids = {}
         self.buf = ''
-        self.logger = logging.getLogger(__name__)
         self.target = 1.0
 
     def do_application_receive(self, parts):
-        self.logger.info("receiving application stream: %r", parts)
+        logger.info("receiving application stream: %r", parts)
         identity = parts[0]
 
         if len(parts[1]) == 0:
             # empty frame, indicate connect/disconnect
             if identity in self.applications:
-                self.logger.info("known client disconnected")
+                logger.info("known client disconnected")
                 del self.applications[identity]
             else:
-                self.logger.info("new client: " + repr(identity))
+                logger.info("new client: " + repr(identity))
                 self.applications[identity] = Application(identity)
         else:
             if identity in self.applications:
@@ -98,26 +99,26 @@ class Daemon(object):
                 application.append_buffer(parts[1])
                 for m in application.get_messages():
                     application.do_transition(m)
-                    self.logger.info("application now in state: %s",
-                                     application.state)
+                    logger.info("application now in state: %s",
+                                application.state)
 
     def do_upstream_receive(self, parts):
-        self.logger.info("receiving upstream message: %r", parts)
+        logger.info("receiving upstream message: %r", parts)
         if len(parts) != 1:
-            self.logger.error("unexpected msg length, dropping it: %r", parts)
+            logger.error("unexpected msg length, dropping it: %r", parts)
             return
         msg = json.loads(parts[0])
         if isinstance(msg, dict):
             command = msg.get('command')
             # TODO: switch to a dispatch dictionary
             if command is None:
-                self.logger.error("missing command in message: %r", msg)
+                logger.error("missing command in message: %r", msg)
                 return
             if command == 'setpower':
                 self.target = float(msg['limit'])
-                self.logger.info("new target measure: %g", self.target)
+                logger.info("new target measure: %g", self.target)
             elif command == 'run':
-                self.logger.info("new container required: %r", msg)
+                logger.info("new container required: %r", msg)
                 pid = self.container_manager.create(msg)
                 if pid > 0:
                     self.containerpids[pid] = msg['uuid']
@@ -135,18 +136,18 @@ class Daemon(object):
                               }
                     self.upstream_pub.send_json(update)
             else:
-                self.logger.error("invalid command: %r", command)
+                logger.error("invalid command: %r", command)
 
     def do_sensor(self):
         self.machine_info = self.sensor.do_update()
-        self.logger.info("current state: %r", self.machine_info)
+        logger.info("current state: %r", self.machine_info)
         total_power = self.machine_info['energy']['power']['total']
         msg = {'type': 'power',
                'total': total_power,
                'limit': self.target
                }
         self.upstream_pub.send_json(msg)
-        self.logger.info("sending sensor message: %r", msg)
+        logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
         total_power = self.machine_info['energy']['power']['total']
@@ -162,7 +163,7 @@ class Daemon(object):
                     application.do_transition('d')
             else:
                 pass
-            self.logger.info("application now in state: %s", application.state)
+            logger.info("application now in state: %s", application.state)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -170,7 +171,7 @@ class Daemon(object):
         elif signum == signal.SIGCHLD:
             ioloop.IOLoop.current().add_callback_from_signal(self.do_children)
         else:
-            self.logger.error("wrong signal: %d", signum)
+            logger.error("wrong signal: %d", signum)
 
     def do_children(self):
         # find out if children have terminated
@@ -182,7 +183,7 @@ class Daemon(object):
             except OSError:
                 break
 
-            self.logger.info("child update %d: %r", pid, status)
+            logger.info("child update %d: %r", pid, status)
             # check if its a pid we care about
             if pid in self.containerpids:
                 # check if this is an exit
@@ -196,7 +197,7 @@ class Daemon(object):
                            }
                     self.upstream_pub.send_json(msg)
             else:
-                self.logger.debug("child update ignored")
+                logger.debug("child update ignored")
                 pass
 
     def do_shutdown(self):
@@ -229,12 +230,9 @@ class Daemon(object):
         upstream_sub_filter = ""
         upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
 
-        self.logger.info("downstream socket bound to: %s",
-                         downstream_bind_param)
-        self.logger.info("upstream pub socket bound to: %s",
-                         upstream_pub_param)
-        self.logger.info("upstream sub socket connected to: %s",
-                         upstream_sub_param)
+        logger.info("downstream socket bound to: %s", downstream_bind_param)
+        logger.info("upstream pub socket bound to: %s", upstream_pub_param)
+        logger.info("upstream sub socket connected to: %s", upstream_sub_param)
 
         # register socket triggers
         self.downstream = zmqstream.ZMQStream(downstream_socket)
