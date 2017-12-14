@@ -89,6 +89,7 @@ class ContainerManager(object):
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
         self.nodeos.delete(uuid, kill=True)
+        self.resourcemanager.update(uuid)
         c = self.containers[uuid]
         del self.containers[uuid]
         del self.pids[c.pid]
