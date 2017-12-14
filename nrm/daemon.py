@@ -123,6 +123,7 @@ class Daemon(object):
                     self.containerpids[pid] = msg['uuid']
                     # TODO: obviously we need to send more info than that
                     update = {'type': 'container',
+                              'event': 'start',
                               'uuid': msg['uuid'],
                               'errno': 0,
                               'pid': pid,
@@ -130,10 +131,15 @@ class Daemon(object):
                     self.upstream_pub.send_json(update)
                 else:
                     update = {'type': 'container',
+                              'event': 'start',
                               'uuid': msg['uuid'],
                               'errno': pid,
                               }
                     self.upstream_pub.send_json(update)
+            elif command == 'kill':
+                self.logger.info("asked to kill container: %r", msg)
+                response = self.container_manager.kill(msg['uuid'])
+                # no update here, as it will trigger child exit
             elif command == 'list':
                 self.logger.info("asked for container list: %r", msg)
                 response = self.container_manager.list()
@@ -194,13 +200,13 @@ class Daemon(object):
             # check if its a pid we care about
             if pid in self.containerpids:
                 # check if this is an exit
-                if os.WIFEXITED(status):
+                if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     uuid = self.containerpids[pid]
                     self.container_manager.delete(uuid)
                     msg = {'type': 'container',
                            'event': 'exit',
                            'status': status,
-                           'uuid': None,
+                           'uuid': uuid,
                            }
                     self.upstream_pub.send_json(msg)
             else:
