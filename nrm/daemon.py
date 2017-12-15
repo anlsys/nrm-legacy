@@ -138,11 +138,11 @@ class Daemon(object):
                               }
                     self.upstream_pub.send_json(update)
             elif command == 'kill':
-                self.logger.info("asked to kill container: %r", msg)
+                logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])
                 # no update here, as it will trigger child exit
             elif command == 'list':
-                self.logger.info("asked for container list: %r", msg)
+                logger.info("asked for container list: %r", msg)
                 response = self.container_manager.list()
                 update = {'type': 'container',
                           'event': 'list',

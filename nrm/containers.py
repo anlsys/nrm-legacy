@@ -99,7 +99,7 @@ class ContainerManager(object):
         """Kill all the processes of a container."""
         if uuid in self.containers:
             c = self.containers[uuid]
-            self.logger.debug("killing %r:", c)
+            logger.debug("killing %r:", c)
             try:
                 os.kill(c.pid, signal.SIGKILL)
             except OSError:

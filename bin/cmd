@@ -91,11 +91,11 @@ class CommandLineInterface(object):
         while(True):
             self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
-            self.logger.info("new message: %r", msg)
+            logger.info("new message: %r", msg)
             # ignore other messages
             if isinstance(msg, dict) and msg.get('type') == 'container':
                 if msg['event'] == 'list':
-                    self.logger.info("list response: %r", msg)
+                    logger.info("list response: %r", msg)
                     break
 
     def do_kill(self, argv):
@@ -111,11 +111,11 @@ class CommandLineInterface(object):
         while(True):
             self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
-            self.logger.info("new message: %r", msg)
+            logger.info("new message: %r", msg)
             # ignore other messages
             if isinstance(msg, dict) and msg.get('type') == 'container':
                 if msg['event'] == 'exit' and msg['uuid'] == argv.uuid:
-                    self.logger.info("container exit: %r", msg)
+                    logger.info("container exit: %r", msg)
                     break
 
     def do_setpower(self, argv):
