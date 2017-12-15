@@ -119,24 +119,16 @@ class Daemon(object):
                 logger.info("new target measure: %g", self.target)
             elif command == 'run':
                 logger.info("new container required: %r", msg)
-                pid = self.container_manager.create(msg)
-                if pid > 0:
-                    self.containerpids[pid] = msg['uuid']
-                    # TODO: obviously we need to send more info than that
-                    update = {'type': 'container',
-                              'event': 'start',
-                              'uuid': msg['uuid'],
-                              'errno': 0,
-                              'pid': pid,
-                              }
-                    self.upstream_pub.send_json(update)
-                else:
-                    update = {'type': 'container',
-                              'event': 'start',
-                              'uuid': msg['uuid'],
-                              'errno': pid,
-                              }
-                    self.upstream_pub.send_json(update)
+                process = self.container_manager.create(msg)
+                self.containerpids[process.pid] = msg['uuid']
+                # TODO: obviously we need to send more info than that
+                update = {'type': 'container',
+                          'event': 'start',
+                          'uuid': msg['uuid'],
+                          'errno': 0,
+                          'pid': process.pid,
+                          }
+                self.upstream_pub.send_json(update)
             elif command == 'kill':
                 logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])

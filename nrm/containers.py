@@ -4,11 +4,10 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 import os
-import signal
 from subprograms import ChrtClient, NodeOSClient, resources
 
 logger = logging.getLogger('nrm')
-Container = namedtuple('Container', ['uuid', 'manifest', 'pid'])
+Container = namedtuple('Container', ['uuid', 'manifest', 'process'])
 
 
 class ContainerManager(object):
@@ -72,7 +71,7 @@ class ContainerManager(object):
         c = Container(container_name, manifest, process)
         self.pids[process.pid] = c
         self.containers[container_name] = c
-        return process.pid
+        return process
 
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
@@ -80,7 +79,7 @@ class ContainerManager(object):
         self.resourcemanager.update(uuid)
         c = self.containers[uuid]
         del self.containers[uuid]
-        del self.pids[c.pid.pid]
+        del self.pids[c.process.pid]
 
     def kill(self, uuid):
         """Kill all the processes of a container."""
@@ -88,11 +87,11 @@ class ContainerManager(object):
             c = self.containers[uuid]
             logger.debug("killing %r:", c)
             try:
-                c.pid.terminate()
+                c.process.proc.terminate()
             except OSError:
                 pass
 
     def list(self):
         """List the containers in the system."""
-        return [{'uuid': c.uuid, 'pid': c.pid.pid} for c in
+        return [{'uuid': c.uuid, 'pid': c.process.pid} for c in
                 self.containers.values()]
