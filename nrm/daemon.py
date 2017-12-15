@@ -76,7 +76,6 @@ class Application(object):
 class Daemon(object):
     def __init__(self):
         self.applications = {}
-        self.containerpids = {}
         self.buf = ''
         self.target = 1.0
 
@@ -119,24 +118,27 @@ class Daemon(object):
                 self.target = float(msg['limit'])
                 logger.info("new target measure: %g", self.target)
             elif command == 'run':
+                container_uuid = msg['uuid']
+                if container_uuid in self.container_manager.containers:
+                    logger.info("container already created: %r",
+                                container_uuid)
+                    return
+
                 logger.info("new container required: %r", msg)
-                process = self.container_manager.create(msg)
-                self.containerpids[process.pid] = msg['uuid']
+                container = self.container_manager.create(msg)
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
-                          'uuid': msg['uuid'],
-                          'errno': 0,
-                          'pid': process.pid,
+                          'uuid': container_uuid,
+                          'errno': 0 if container else -1,
+                          'pid': container.process.pid,
                           }
                 self.upstream_pub.send_json(update)
                 # setup io callbacks
-                process.stdout.read_until_close(partial(self.do_children_io,
-                                                        msg['uuid'],
-                                                        'stdout'))
-                process.stderr.read_until_close(partial(self.do_children_io,
-                                                        msg['uuid'],
-                                                        'stderr'))
+                outcb = partial(self.do_children_io, container_uuid, 'stdout')
+                errcb = partial(self.do_children_io, container_uuid, 'stderr')
+                container.process.stdout.read_until_close(outcb)
+                container.process.stderr.read_until_close(errcb)
             elif command == 'kill':
                 logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])
@@ -211,15 +213,15 @@ class Daemon(object):
 
             logger.info("child update %d: %r", pid, status)
             # check if its a pid we care about
-            if pid in self.containerpids:
+            if pid in self.container_manager.pids:
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
-                    uuid = self.containerpids[pid]
-                    self.container_manager.delete(uuid)
+                    container = self.container_manager.pids[pid]
+                    self.container_manager.delete(container.uuid)
                     msg = {'type': 'container',
                            'event': 'exit',
                            'status': status,
-                           'uuid': uuid,
+                           'uuid': container.uuid,
                            }
                     self.upstream_pub.send_json(msg)
             else:

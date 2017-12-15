@@ -35,7 +35,7 @@ class ContainerManager(object):
         manifest = ImageManifest()
         if not manifest.load(manifestfile):
             logger.error("Manifest is invalid")
-            return -1
+            return None
 
         # ask the resource manager for resources
         req = resources(int(manifest.app.isolators.container.cpus.value),
@@ -71,7 +71,7 @@ class ContainerManager(object):
         c = Container(container_name, manifest, process)
         self.pids[process.pid] = c
         self.containers[container_name] = c
-        return process
+        return c
 
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
