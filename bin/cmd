@@ -75,8 +75,9 @@ class CommandLineInterface(object):
             # ignore other messages
             if isinstance(msg, dict) and msg.get('type') == 'container':
                 if msg['uuid'] == containerid:
-                    logger.info("container response: %r", msg)
-                    break
+                    logger.info("container msg: %r", msg)
+                    if msg['event'] == 'exit':
+                        break
 
     def do_list(self, argv):
         """Connect to the NRM and ask to list the containers present on the

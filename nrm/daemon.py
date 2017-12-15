@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from containers import ContainerManager
 from resources import ResourceManager
+from functools import partial
 import json
 import logging
 import os
@@ -129,6 +130,13 @@ class Daemon(object):
                           'pid': process.pid,
                           }
                 self.upstream_pub.send_json(update)
+                # setup io callbacks
+                process.stdout.read_until_close(partial(self.do_children_io,
+                                                        msg['uuid'],
+                                                        'stdout'))
+                process.stderr.read_until_close(partial(self.do_children_io,
+                                                        msg['uuid'],
+                                                        'stderr'))
             elif command == 'kill':
                 logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])
@@ -143,6 +151,18 @@ class Daemon(object):
                 self.upstream_pub.send_json(update)
             else:
                 logger.error("invalid command: %r", command)
+
+    def do_children_io(self, uuid, io, data):
+        """Receive data from one of the children, and send it down the pipe.
+
+        Meant to be partially defined on a children basis."""
+        logger.info("%r received %r data: %r", uuid, io, data)
+        update = {'type': 'container',
+                  'event': io,
+                  'uuid': uuid,
+                  'payload': data or 'eof',
+                  }
+        self.upstream_pub.send_json(update)
 
     def do_sensor(self):
         self.machine_info = self.sensor.do_update()
