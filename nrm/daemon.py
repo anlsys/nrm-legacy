@@ -137,8 +137,8 @@ class Daemon(object):
                 # setup io callbacks
                 outcb = partial(self.do_children_io, container_uuid, 'stdout')
                 errcb = partial(self.do_children_io, container_uuid, 'stderr')
-                container.process.stdout.read_until_close(outcb)
-                container.process.stderr.read_until_close(errcb)
+                container.process.stdout.read_until_close(outcb, outcb)
+                container.process.stderr.read_until_close(errcb, outcb)
             elif command == 'kill':
                 logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])
