@@ -1,8 +1,9 @@
 """Various clients for system utilities."""
-import subprocess
 import collections
 import logging
 import xml.etree.ElementTree
+import tornado.process as process
+import subprocess
 
 logger = logging.getLogger('nrm')
 resources = collections.namedtuple("Resources", ["cpus", "mems"])
@@ -102,6 +103,22 @@ class NodeOSClient(object):
                              stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         logpopen(p, args, stdout, stderr)
+
+    def execute(self, name, argv, environ):
+        """Execute argv inside container."""
+        args = [self.prefix]
+        cmd = '--exec='
+        cmd += 'name:{0}'.format(name)
+        # argo_nodeos_config takes argv as 'arg0 arg1 ...' so we need to merge
+        # the arguments into a single list, with single quotes. We also need
+        # to escape spaces from arguments before.
+        argv = [s.replace(' ', r'\ ') for s in argv]
+        cmd += " argv:'"+" ".join(argv)+"'"
+        args.append(cmd)
+        return process.Subprocess(args, stdin=process.Subprocess.STREAM,
+                                  stdout=process.Subprocess.STREAM,
+                                  stderr=process.Subprocess.STREAM,
+                                  env=environ)
 
 
 class ChrtClient(object):
