@@ -4,12 +4,10 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 import os
-import signal
 from subprograms import ChrtClient, NodeOSClient, resources
-import sys
 
 logger = logging.getLogger('nrm')
-Container = namedtuple('Container', ['uuid', 'manifest', 'pid'])
+Container = namedtuple('Container', ['uuid', 'manifest', 'process'])
 
 
 class ContainerManager(object):
@@ -37,7 +35,7 @@ class ContainerManager(object):
         manifest = ImageManifest()
         if not manifest.load(manifestfile):
             logger.error("Manifest is invalid")
-            return -1
+            return None
 
         # ask the resource manager for resources
         req = resources(int(manifest.app.isolators.container.cpus.value),
@@ -60,32 +58,20 @@ class ContainerManager(object):
         self.nodeos.create(container_name, allocation)
         logger.info("created container %s", container_name)
 
-        newpid = os.fork()
-        logger.info("forked: new pid: %s", newpid)
-        if newpid == 0:
-            # move myself to that container
-            mypid = os.getpid()
-            self.nodeos.attach(container_name, mypid)
-            logger.info("child: attached to container %s", container_name)
-
-            # run my command
-            if hasattr(manifest.app.isolators, 'scheduler'):
-                sched = manifest.app.isolators.scheduler
-                argv = self.chrt.getwrappedcmd(sched)
-            else:
-                argv = []
-
-            argv.append(command)
-            argv.extend(args)
-            logger.debug("execvpe %r", argv)
-            os.execvpe(argv[0], argv, environ)
-            # should never happen
-            sys.exit(1)
+        # run my command
+        if hasattr(manifest.app.isolators, 'scheduler'):
+            sched = manifest.app.isolators.scheduler
+            argv = self.chrt.getwrappedcmd(sched)
         else:
-            c = Container(container_name, manifest, newpid)
-            self.pids[newpid] = c
-            self.containers[container_name] = c
-            return newpid
+            argv = []
+
+        argv.append(command)
+        argv.extend(args)
+        process = self.nodeos.execute(container_name, argv, environ)
+        c = Container(container_name, manifest, process)
+        self.pids[process.pid] = c
+        self.containers[container_name] = c
+        return c
 
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
@@ -93,7 +79,7 @@ class ContainerManager(object):
         self.resourcemanager.update(uuid)
         c = self.containers[uuid]
         del self.containers[uuid]
-        del self.pids[c.pid]
+        del self.pids[c.process.pid]
 
     def kill(self, uuid):
         """Kill all the processes of a container."""
@@ -101,12 +87,11 @@ class ContainerManager(object):
             c = self.containers[uuid]
             logger.debug("killing %r:", c)
             try:
-                os.kill(c.pid, signal.SIGKILL)
+                c.process.proc.terminate()
             except OSError:
                 pass
 
     def list(self):
         """List the containers in the system."""
-        fields = ['uuid', 'pid']
-        ret = [c._asdict() for c in self.containers.values()]
-        return [{k: d[k] for k in fields} for d in ret]
+        return [{'uuid': c.uuid, 'pid': c.process.pid} for c in
+                self.containers.values()]

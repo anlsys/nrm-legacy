@@ -67,16 +67,43 @@ class CommandLineInterface(object):
                    'args': argv.args,
                    'uuid': containerid,
                    }
-
+        # command fsm
+        state = 'init'
+        outeof = False
+        erreof = False
+        exitmsg = None
+        self.upstream_pub_socket.send_json(command)
         while(True):
-            self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
-            logger.info("new message: %r", msg)
-            # ignore other messages
             if isinstance(msg, dict) and msg.get('type') == 'container':
                 if msg['uuid'] == containerid:
-                    logger.info("container response: %r", msg)
-                    break
+                    if msg['event'] == 'start':
+                        if state == 'init':
+                            state = 'started'
+                            logger.info("container started: %r", msg)
+                        else:
+                            logger.info("unexpected start message: %r", state)
+                            exit(1)
+                    elif msg['event'] == 'stdout':
+                        logger.info("container msg: %r", msg)
+                        if msg['payload'] == 'eof':
+                            outeof = True
+                    elif msg['event'] == 'stderr':
+                        logger.info("container msg: %r", msg)
+                        if msg['payload'] == 'eof':
+                            erreof = True
+                    elif msg['event'] == 'exit':
+                        if state == 'started':
+                            state = 'exiting'
+                            exitmsg = msg
+                        else:
+                            logger.info("unexpected exit message: %r", msg)
+            if state == 'init':
+                self.upstream_pub_socket.send_json(command)
+            if outeof and erreof and state == 'exiting':
+                state = 'exit'
+                logger.info("container ended: %r", exitmsg)
+                break
 
     def do_list(self, argv):
         """Connect to the NRM and ask to list the containers present on the
