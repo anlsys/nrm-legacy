@@ -31,10 +31,10 @@ class CommandLineInterface(object):
         self.upstream_pub_socket = self.context.socket(zmq.PUB)
         self.upstream_sub_socket = self.context.socket(zmq.SUB)
 
-        upstream_pub_param = "tcp://*:%d" % (upstream_pub_port)
+        upstream_pub_param = "tcp://localhost:%d" % (upstream_pub_port)
         upstream_sub_param = "tcp://localhost:%d" % (upstream_sub_port)
 
-        self.upstream_pub_socket.bind(upstream_pub_param)
+        self.upstream_pub_socket.connect(upstream_pub_param)
         self.upstream_sub_socket.connect(upstream_sub_param)
         # we want to receive everything for now
         upstream_sub_filter = ""
@@ -98,8 +98,6 @@ class CommandLineInterface(object):
                             exitmsg = msg
                         else:
                             logger.info("unexpected exit message: %r", msg)
-            if state == 'init':
-                self.upstream_pub_socket.send_json(command)
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
                 logger.info("container ended: %r", exitmsg)
@@ -115,8 +113,8 @@ class CommandLineInterface(object):
         command = {'command': 'list',
                    }
 
+        self.upstream_pub_socket.send_json(command)
         while(True):
-            self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
             logger.info("new message: %r", msg)
             # ignore other messages
@@ -135,8 +133,8 @@ class CommandLineInterface(object):
                    'uuid': argv.uuid
                    }
 
+        self.upstream_pub_socket.send_json(command)
         while(True):
-            self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
             logger.info("new message: %r", msg)
             # ignore other messages
@@ -159,8 +157,8 @@ class CommandLineInterface(object):
                    'limit': argv.limit,
                    }
 
+        self.upstream_pub_socket.send_json(command)
         while(True):
-            self.upstream_pub_socket.send_json(command)
             msg = self.upstream_sub_socket.recv_json()
             logger.info("new message: %r", msg)
             # ignore other messages

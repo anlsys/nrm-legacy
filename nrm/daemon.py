@@ -250,11 +250,11 @@ class Daemon(object):
 
         downstream_bind_param = "tcp://%s:%d" % (bind_address, bind_port)
         upstream_pub_param = "tcp://%s:%d" % (bind_address, upstream_pub_port)
-        upstream_sub_param = "tcp://localhost:%d" % (upstream_sub_port)
+        upstream_sub_param = "tcp://%s:%d" % (bind_address, upstream_sub_port)
 
         downstream_socket.bind(downstream_bind_param)
         upstream_pub_socket.bind(upstream_pub_param)
-        upstream_sub_socket.connect(upstream_sub_param)
+        upstream_sub_socket.bind(upstream_sub_param)
         upstream_sub_filter = ""
         upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
 
