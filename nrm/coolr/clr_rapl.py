@@ -214,7 +214,7 @@ class rapl_reader:
         e = self.read_energy_acc()
         self.stop_time = time.time()
 
-    def sample_and_json(self, label = "", accflag = False, node = ""):
+    def sample(self, accflag=False):
         if not self.initialized():
             return
 
@@ -226,55 +226,32 @@ class rapl_reader:
             if k != 'time':
                 if accflag:
                     self.totalenergy[k] += de[k]
-                self.lastpower[k] = de[k]/de['time']/1000.0/1000.0;
+                self.lastpower[k] = de[k]/de['time']/1000.0/1000.0
         self.prev_e = e
 
-        # constructing a json output
-        s  = '{"sample":"energy","time":%.3f' % (e['time'])
-        if len(node) > 0:
-            s += ',"node":"%s"' % node
-        if len(label) > 0:
-            s += ',"label":"%s"' % label
-        s += ',"energy":{'
-        firstitem = True
+        ret = dict()
+        ret['energy'] = dict()
         for k in sorted(e.keys()):
             if k != 'time':
-                if firstitem:
-                    firstitem = False
-                else:
-                    s+=','
-                s += '"%s":%d' % (self.shortenkey(k), e[k])
-        s += '},'
-        s += '"power":{'
+                ret['energy'][self.shortenkey(k)] = e[k]
 
+        ret['power'] = dict()
         totalpower = 0.0
-        firstitem = True
         for k in sorted(self.lastpower.keys()):
             if k != 'time':
-                if firstitem:
-                    firstitem = False
-                else:
-                    s+=','
-                s += '"%s":%.1f' % (self.shortenkey(k), self.lastpower[k])
-                # this is a bit ad hoc way to calculate the total. needs to be fixed later
+                ret['power'][self.shortenkey(k)] = self.lastpower[k]
+                # this is a bit ad hoc way to calculate the total.
+                # needs to be fixed later
                 if k.find("core") == -1:
                     totalpower += self.lastpower[k]
-        s += ',"total":%.1f' % (totalpower)
-        s += '},'
+        ret['power']['total'] = totalpower
 
-        s += '"powercap":{'
+        ret['powercap'] = dict()
         rlimit = self.readpowerlimitall()
-        firstitem = True
         for k in sorted(rlimit.keys()):
-            if firstitem:
-                firstitem = False
-            else:
-                s+=','
-            s += '"%s":%.1f' % (self.shortenkey(k), rlimit[k]['curW'])
-        s += '}'
+            ret['powercap'][self.shortenkey(k)] = rlimit[k]['curW']
 
-        s += '}'
-        return s
+        return ret
 
     def total_energy_json(self):
         if not self.initialized():
