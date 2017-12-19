@@ -49,11 +49,11 @@ class ContainerManager(object):
                            "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
-        environ['container'] = 'argo'
         logger.info("run: environ: %r", environ)
 
         # create container
         container_name = request['uuid']
+        environ['ARGO_CONTAINER_UUID'] = container_name
         logger.info("creating container %s", container_name)
         self.nodeos.create(container_name, allocation)
         logger.info("created container %s", container_name)
