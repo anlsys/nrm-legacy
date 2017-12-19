@@ -65,6 +65,11 @@ class ContainerManager(object):
         else:
             argv = []
 
+        # for now we place it within the container, but it's probably better
+        # if it's outside (so move it to NodeOSClient?)
+        if hasattr(manifest.app.isolators, 'perfwrapper') and hasattr(manifest.app.isolators.perfwrapper, 'enabled') and manifest.app.isolators.perfwrapper.enabled in ["1", "True"]:
+            argv.append('argo-perf-wrapper')
+
         argv.append(command)
         argv.extend(args)
         process = self.nodeos.execute(container_name, argv, environ)

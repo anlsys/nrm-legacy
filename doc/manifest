@@ -17,6 +17,12 @@
 					"cpus": "4",
 					"mems": "1"
 				}
+			},
+			{
+				"name": "argo/perfwrapper",
+				"value": {
+					 "enabled": "1"
+				}
 			}
 		]
 	}
