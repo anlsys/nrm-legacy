@@ -108,7 +108,7 @@ class DownstreamApplication(object):
         self.progress.start()
 
         # retrieve our container uuid
-        self.container_uuid = os.environ.get('container')
+        self.container_uuid = os.environ.get('ARGO_CONTAINER_UUID')
         if self.container_uuid is None:
             logger.error("missing container uuid")
             exit(1)
