@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
+from controller import Controller
 from functools import partial
 import json
 import logging
@@ -126,29 +127,11 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        total_power = self.machine_info['energy']['power']['total']
-
-        for identity, application in \
-                self.application_manager.applications.iteritems():
-            update = {'type': 'application',
-                      'command': 'threads',
-                      'uuid': identity,
-                      'event': 'threads',
-                      }
-            if total_power < self.target:
-                if 'i' in application.get_allowed_thread_requests():
-                    update['payload'] = application.threads['cur'] + 1
-                    self.downstream_pub.send_json(update)
-                    application.do_thread_transition('i')
-            elif total_power > self.target:
-                if 'd' in application.get_allowed_thread_requests():
-                    update['payload'] = application.threads['cur'] - 1
-                    self.downstream_pub.send_json(update)
-                    application.do_thread_transition('d')
-            else:
-                continue
-            logger.info("application now in state: %s",
-                        application.thread_state)
+        action = self.controller.planify(self.target, self.machine_info)
+        if action:
+            msg = self.controller.execute(action)
+            self.downstream_pub.send_json(msg)
+            self.controller.update(action, msg)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -237,6 +220,9 @@ class Daemon(object):
         self.resource_manager = ResourceManager()
         self.container_manager = ContainerManager(self.resource_manager)
         self.application_manager = ApplicationManager()
+        self.controller = Controller(self.application_manager,
+                                     self.container_manager,
+                                     self.resource_manager)
 
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
