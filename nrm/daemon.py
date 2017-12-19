@@ -1,49 +1,23 @@
 from __future__ import print_function
 
+from applications import ApplicationManager
 from containers import ContainerManager
-from resources import ResourceManager
 from functools import partial
 import json
 import logging
 import os
+from resources import ResourceManager
 import sensor
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
 
 
-application_fsm_table = {'stable': {'i': 's_ask_i', 'd': 's_ask_d'},
-                         's_ask_i': {'done': 'stable', 'max': 'max'},
-                         's_ask_d': {'done': 'stable', 'min': 'min'},
-                         'max': {'d': 'max_ask_d'},
-                         'min': {'i': 'min_ask_i'},
-                         'max_ask_d': {'done': 'stable', 'min': 'nop'},
-                         'min_ask_i': {'done': 'stable', 'max': 'nop'},
-                         'nop': {}}
-
 logger = logging.getLogger('nrm')
-
-
-class Application(object):
-    def __init__(self, identity):
-        self.identity = identity
-        self.state = 'stable'
-
-    def do_transition(self, msg):
-        transitions = application_fsm_table[self.state]
-        if msg in transitions:
-            self.state = transitions[msg]
-        else:
-            pass
-
-    def get_allowed_requests(self):
-        return application_fsm_table[self.state].keys()
 
 
 class Daemon(object):
     def __init__(self):
-        self.applications = {}
-        self.buf = ''
         self.target = 1.0
 
     def do_downstream_receive(self, parts):
@@ -59,15 +33,19 @@ class Daemon(object):
                 logger.error("wrong message format: %r", msg)
                 return
             if event == 'start':
-                logger.info("new application: %r", msg)
-                identity = msg['uuid']
-                self.applications[identity] = Application(identity)
+                self.application_manager.register(msg)
             elif event == 'threads':
-                logger.info("change in threads")
-                application = self.applications[msg['uuid']]
-                application.do_transition(msg['payload'])
+                uuid = msg['uuid']
+                if uuid in self.application_manager.applications:
+                    app = self.application_manager.applications[uuid]
+                    app.update_threads(msg)
             elif event == 'progress':
-                logger.info("new progress")
+                uuid = msg['uuid']
+                if uuid in self.application_manager.applications:
+                    app = self.application_manager.applications[uuid]
+                    app.update_progress(msg)
+            elif event == 'exit':
+                self.application_manager.delete(msg['uuid'])
             else:
                 logger.error("unknown event: %r", event)
                 return
@@ -150,18 +128,27 @@ class Daemon(object):
     def do_control(self):
         total_power = self.machine_info['energy']['power']['total']
 
-        for identity, application in self.applications.iteritems():
+        for identity, application in \
+                self.application_manager.applications.iteritems():
+            update = {'type': 'application',
+                      'command': 'threads',
+                      'uuid': identity,
+                      'event': 'threads',
+                      }
             if total_power < self.target:
-                if 'i' in application.get_allowed_requests():
-                    self.downstream.send_multipart([identity, 'i'])
-                    application.do_transition('i')
+                if 'i' in application.get_allowed_thread_requests():
+                    update['payload'] = application.threads['cur'] + 1
+                    self.downstream_pub.send_json(update)
+                    application.do_thread_transition('i')
             elif total_power > self.target:
-                if 'd' in application.get_allowed_requests():
-                    self.downstream.send_multipart([identity, 'd'])
-                    application.do_transition('d')
+                if 'd' in application.get_allowed_thread_requests():
+                    update['payload'] = application.threads['cur'] - 1
+                    self.downstream_pub.send_json(update)
+                    application.do_thread_transition('d')
             else:
-                pass
-            logger.info("application now in state: %s", application.state)
+                continue
+            logger.info("application now in state: %s",
+                        application.thread_state)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -246,9 +233,10 @@ class Daemon(object):
         self.upstream_pub = zmqstream.ZMQStream(upstream_pub_socket)
         self.downstream_pub = zmqstream.ZMQStream(downstream_pub_socket)
 
-        # create resource and container manager
+        # create managers
         self.resource_manager = ResourceManager()
         self.container_manager = ContainerManager(self.resource_manager)
+        self.application_manager = ApplicationManager()
 
         # create sensor manager and make first measurement
         self.sensor = sensor.SensorManager()
