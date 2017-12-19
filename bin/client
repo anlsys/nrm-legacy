@@ -1,8 +1,0 @@
-#!/usr/bin/env python2
-
-from __future__ import print_function
-import nrm
-import nrm.client
-
-if __name__ == "__main__":
-    nrm.client.runner()
