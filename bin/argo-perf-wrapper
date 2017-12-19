@@ -12,6 +12,7 @@ import uuid
 
 logger = logging.getLogger('perf-wrapper')
 
+
 class PerfWrapper(object):
 
     """Implements middleware between the Linux perf and
@@ -89,7 +90,7 @@ class PerfWrapper(object):
         tmpdir = tempfile.mkdtemp()
         fifoname = os.path.join(tmpdir, 'perf-fifo')
         logger.info("fifoname: %r", fifoname)
-        os.mkfifo(fifoname, 0600)
+        os.mkfifo(fifoname, 0o600)
 
         argv = ['perf', 'stat', '-e', 'instructions', '-x', ',',
                 '-I', str(args.frequency), '-o', fifoname, '--']
@@ -107,11 +108,11 @@ class PerfWrapper(object):
         # "for line in fifo" idiom didn't work for me here -- Python was
         # buffering the output internally until perf was finished.
         while True:
-            line = fifo.readline();
+            line = fifo.readline()
             if not line:
                 break
 
-            line = line.strip();
+            line = line.strip()
             if len(line) == 0 or line[0] == '#':
                 continue
             tokens = line.split(',')
@@ -137,6 +138,7 @@ class PerfWrapper(object):
         fifo.close()
         os.remove(fifoname)
         os.rmdir(tmpdir)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING)
