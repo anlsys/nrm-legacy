@@ -40,5 +40,5 @@ class SensorManager:
         # only return enabled domains
         return {k: pl[k] for k in pl if pl[k]['enabled']}
 
-    def set_powerlimits(self, domain, value):
+    def set_powerlimit(self, domain, value):
         self.rapl.set_powerlimit(value, domain)
