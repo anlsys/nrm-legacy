@@ -34,6 +34,16 @@ class Application(object):
     def get_allowed_thread_requests(self):
         return self.thread_fsm_table[self.thread_state].keys()
 
+    def get_thread_request_impact(self, command):
+        # TODO: not a real model
+        if command not in self.thread_fsm_table[self.thread_state]:
+            return 0.0
+        speed = float(self.progress)/float(self.threads['cur'])
+        if command == 'i':
+            return speed
+        else:
+            return -speed
+
     def update_threads(self, msg):
         """Update the thread tracking."""
         newth = msg['payload']
