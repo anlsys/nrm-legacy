@@ -2,13 +2,13 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller
+from controller import Controller, ApplicationActuator, PowerActuator
 from functools import partial
 import json
 import logging
 import os
 from resources import ResourceManager
-import sensor
+from sensor import SensorManager
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
@@ -116,7 +116,7 @@ class Daemon(object):
         self.upstream_pub.send_json(update)
 
     def do_sensor(self):
-        self.machine_info = self.sensor.do_update()
+        self.machine_info = self.sensor_manager.do_update()
         logger.info("current state: %r", self.machine_info)
         total_power = self.machine_info['energy']['power']['total']
         msg = {'type': 'power',
@@ -127,11 +127,11 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        action = self.controller.planify(self.target, self.machine_info)
+        plan = self.controller.planify(self.target, self.machine_info)
+        action, actuator = plan
         if action:
-            msg = self.controller.execute(action)
-            self.downstream_pub.send_json(msg)
-            self.controller.update(action, msg)
+            self.controller.execute(action, actuator)
+            self.controller.update(action, actuator)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -169,7 +169,7 @@ class Daemon(object):
                 pass
 
     def do_shutdown(self):
-        self.sensor.stop()
+        self.sensor_manager.stop()
         ioloop.IOLoop.current().stop()
 
     def main(self):
@@ -220,14 +220,13 @@ class Daemon(object):
         self.resource_manager = ResourceManager()
         self.container_manager = ContainerManager(self.resource_manager)
         self.application_manager = ApplicationManager()
-        self.controller = Controller(self.application_manager,
-                                     self.container_manager,
-                                     self.resource_manager)
+        self.sensor_manager = SensorManager()
+        aa = ApplicationActuator(self.application_manager, self.downstream_pub)
+        pa = PowerActuator(self.sensor_manager)
+        self.controller = Controller([aa, pa])
 
-        # create sensor manager and make first measurement
-        self.sensor = sensor.SensorManager()
-        self.sensor.start()
-        self.machine_info = self.sensor.do_update()
+        self.sensor_manager.start()
+        self.machine_info = self.sensor_manager.do_update()
 
         # setup periodic sensor updates
         self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, 1000)

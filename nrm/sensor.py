@@ -34,3 +34,11 @@ class SensorManager:
         machine_info['energy'] = self.rapl.sample(accflag=True)
         machine_info['temperature'] = self.coretemp.sample()
         return machine_info
+
+    def get_powerlimits(self):
+        pl = self.rapl.get_powerlimits()
+        # only return enabled domains
+        return {k: pl[k] for k in pl if pl[k]['enabled']}
+
+    def set_powerlimits(self, domain, value):
+        self.rapl.set_powerlimit(value, domain)
