@@ -65,6 +65,15 @@ class ContainerManager(object):
         else:
             argv = []
 
+        # It would've been better if argo-perf-wrapper wrapped around
+        # argo-nodeos-config and not the final command -- that way it would
+        # be running outside of the container.  However, because
+        # argo-nodeos-config is suid root, perf can't monitor it.
+        if hasattr(manifest.app.isolators, 'perfwrapper'):
+            if hasattr(manifest.app.isolators.perfwrapper, 'enabled'):
+                if manifest.app.isolators.perfwrapper.enabled in ["1", "True"]:
+                    argv.append('argo-perf-wrapper')
+
         argv.append(command)
         argv.extend(args)
         process = self.nodeos.execute(container_name, argv, environ)
