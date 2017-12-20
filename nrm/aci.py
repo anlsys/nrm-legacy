@@ -125,13 +125,35 @@ class Container(SpecField):
         """Load container information."""
         return super(Container, self).load(data)
 
+class PerfWrapper(SpecField):
+
+    """Information on whether to use perf for a container."""
+
+    fields = {"enabled": spec(unicode, False)
+              }
+
+    def __init__(self):
+        """Create empty perf wrapper."""
+        pass
+
+    def load(self, data):
+        """Load perf wrapper information."""
+        ret = super(PerfWrapper, self).load(data)
+        if not ret:
+            return ret
+        if self.enabled not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value of perfwrapper enabled: %s",
+                         self.enabled)
+            return False
+        return True
 
 class IsolatorList(SpecField):
 
     """Represent the list of isolator in a Manifest."""
 
     types = {"argo/scheduler": spec(Scheduler, False),
-             "argo/container": spec(Container, True)
+             "argo/container": spec(Container, True),
+             "argo/perfwrapper": spec(PerfWrapper, False)
              }
 
     def __init__(self):
