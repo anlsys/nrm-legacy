@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import logging
+from operator import attrgetter
 
 logger = logging.getLogger('nrm')
 
@@ -9,9 +10,27 @@ class Action(object):
 
     """Information about a control action."""
 
-    def __init__(self, target, command):
+    def __init__(self, target, command, delta):
         self.target = target
         self.command = command
+        self.delta = delta
+
+
+class ApplicationActuator(object):
+
+    """Actuator in charge of application thread control."""
+
+    def __init__(self, am):
+        self.application_manager = am
+
+    def available_actions(self, target):
+        ret = []
+        for identity, application in \
+                self.application_manager.applications.iteritems():
+            if target in application.get_allowed_thread_requests():
+                delta = application.get_thread_request_impact(target)
+                ret.append(Action(application, target, delta))
+        return ret
 
 
 class Controller(object):
@@ -22,21 +41,25 @@ class Controller(object):
         self.application_manager = am
         self.container_manager = cm
         self.resource_manager = rm
+        self.app_actuator = ApplicationActuator(am)
 
     def planify(self, target, machineinfo):
         """Plan the next action for the control loop."""
         total_power = machineinfo['energy']['power']['total']
+        direction = None
         if total_power < target:
-            for identity, application in \
-                    self.application_manager.applications.iteritems():
-                if 'i' in application.get_allowed_thread_requests():
-                    return Action(application, 'i')
+            direction = 'i'
         elif total_power > target:
-            for identity, application in \
-                    self.application_manager.applications.iteritems():
-                if 'd' in application.get_allowed_thread_requests():
-                    return Action(application, 'd')
-        return None
+            direction = 'd'
+
+        if direction:
+            actions = self.app_actuator.available_actions(direction)
+            if actions:
+                # TODO: better choice
+                actions.sort(key=attrgetter('delta'))
+                return actions.pop()
+            else:
+                return None
 
     def execute(self, action):
         """Build the action for the appropriate manager."""
