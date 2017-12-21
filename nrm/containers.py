@@ -45,8 +45,8 @@ class ContainerManager(object):
 
         # build context to execute
         environ = os.environ
-        environ['PATH'] = ("/usr/local/sbin:"
-                           "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+        # environ['PATH'] = ("/usr/local/sbin:"
+        #                   "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
         logger.info("run: environ: %r", environ)
