@@ -11,3 +11,8 @@ two years ago.
 | **Systemwide Power Management with Argo**
 | Dan Ellsworth, Tapasya Patki, Swann Perarnau, Pete Beckman *et al*
 | In *High-Performance, Power-Aware Computing (HPPAC)*, 2016.
+
+## Packaging
+
+building:
+nix-build -A nrm
