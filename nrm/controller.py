@@ -65,16 +65,16 @@ class PowerActuator(object):
         logger.info("power limits: %r:", pl)
         if target == 'i':
             for k in pl:
-                r = range(int(pl[k]['curW']), int(pl[k]['maxW']))
+                r = range(int(pl[k]['curW'])+1, int(pl[k]['maxW']))
                 actions.extend([Action(k, s, s - r[0]) for s in r])
         elif target == 'd':
             for k in pl:
-                r = range(0, int(pl[k]['curW']))
-                actions.extend([Action(k, s, s - r[-1]) for s in r])
+                r = range(1, int(pl[k]['curW']))
+                actions.extend([Action(k, s, r[-1] - s) for s in r])
         return actions
 
     def execute(self, action):
-        logger.info("changing power limit: %r", action)
+        logger.info("changing power limit: %r, %r", action.command, action.delta)
         self.sensor_manager.set_powerlimit(action.target, action.command)
 
     def update(self, action):
@@ -105,7 +105,7 @@ class Controller(object):
             if actions:
                 # TODO: better choice
                 actions.sort(key=lambda x: x[0].delta)
-                return actions.pop()
+                return actions.pop(0)
             else:
                 return (None, None)
 

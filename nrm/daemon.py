@@ -19,7 +19,7 @@ logger = logging.getLogger('nrm')
 
 class Daemon(object):
     def __init__(self):
-        self.target = 1.0
+        self.target = 100.0
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)

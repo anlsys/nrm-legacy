@@ -4,7 +4,7 @@ source:
 	$(PYTHON) setup.py sdist
 
 install:
-	$(PYTHON) setup.py install --force --prefix /g/g91/ramesh2/ARGO/NRM
+	$(PYTHON) setup.py install --force
 
 check:
 	tox
