@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import logging
+import time
 
 logger = logging.getLogger('nrm')
 
@@ -56,8 +57,11 @@ class Application(object):
 
     def update_progress(self, msg):
         """Update the progress tracking."""
-        assert self.progress
+        payload = self.progress + float(msg['payload'])
 
+    def reset_progress(self, msg):
+        """Update the progress tracking."""
+        self.progress = 0
 
 class ApplicationManager(object):
 

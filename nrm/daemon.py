@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller, ApplicationActuator, PowerActuator
+from controller import BanditController, ApplicationActuator, DiscretizedPowerActuator
 from functools import partial
 import json
 import logging
@@ -127,11 +127,11 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        plan = self.controller.planify(self.target, self.machine_info)
-        action, actuator = plan
+        plan = self.controller.planify(self.target, self.machine_info, self.application_manager.applications)
+        actions, actuators = plan
         if action:
-            self.controller.execute(action, actuator)
-            self.controller.update(action, actuator)
+            self.controller.execute(actions, actuators)
+            self.controller.update(actions, actuators)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -221,9 +221,9 @@ class Daemon(object):
         self.container_manager = ContainerManager(self.resource_manager)
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        aa = ApplicationActuator(self.application_manager, self.downstream_pub)
-        pa = PowerActuator(self.sensor_manager)
-        self.controller = Controller([aa, pa])
+        # aa = ApplicationActuator(self.application_manager, self.downstream_pub)
+        pa = DiscretizedPowerActuator(self.sensor_manager,100,4)
+        self.controller = BanditController([pa])
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()
