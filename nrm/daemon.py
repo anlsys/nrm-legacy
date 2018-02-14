@@ -127,11 +127,9 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        plan = self.controller.planify(self.target, self.machine_info, self.application_manager.applications)
-        actions, actuators = plan
-        if action:
-            self.controller.execute(actions, actuators)
-            self.controller.update(actions, actuators)
+        actions, actuators = self.controller.planify(self.target, self.machine_info, self.application_manager.applications)
+        self.controller.execute(actions, actuators)
+        self.controller.update(actions, actuators)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -222,7 +220,7 @@ class Daemon(object):
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
         # aa = ApplicationActuator(self.application_manager, self.downstream_pub)
-        pa = DiscretizedPowerActuator(self.sensor_manager,100,4)
+        pa = DiscretizedPowerActuator(self.sensor_manager,lowerboundwatts=100,k=4)
         self.controller = BanditController([pa])
 
         self.sensor_manager.start()
