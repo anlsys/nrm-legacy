@@ -84,23 +84,18 @@ class DiscretizedPowerActuator(object):
     def update(self, action):
         pass
 
-
 class BasicPowerLoss(object):
-    def __init__(self, a, b, power_min=100000000, power_max=0, progress_min=1000000000, progress_max=0):
-        self.a = a
-        self.b = b
-        self.power_min = power_min
+    def __init__(self, alpha, power_max=0, progress_max=0):
+        self.alpha = alpha
         self.power_max = power_max
-        self.progress_min = progress_min
         self.progress_max = progress_max
 
     def loss(self,progress,power):
         if power>self.power_max: self.power_max = power
-        if power<self.power_min: self.power_min = power
         if progress>self.progress_max: self.progress_max = progress
-        if progress<self.progress_min: self.progress_min = progress
-        return((self.a*(power-self.power_min)/(max(0.001, self.power_max-self.power_min))) + 
-                (self.b*(progress-self.progress_min)/(max(0.001,self.progress_max-self.progress_min))))
+        power_n=power/max(0.001, self.power_max)
+        progress_n=progress/max(0.001, self.progress_max)
+        return(self.alpha*power_n + (1-self.alpha)*progress_n)
 
 class EpsGreedyBandit(object):
     """Epsilon greedy bandit. Actions in O,..,k-1."""
@@ -120,12 +115,12 @@ class EpsGreedyBandit(object):
         assert(loss >= 0)
         # logging.info("NEXT0!! Arriving with self.n :%s" %str(self.n))
         # logging.info("NEXT0!! Arriving with self.a :%s" %str(self.a))
-        if self.a!=None:
+        if self.a is not None:
            self.losses[self.a]=self.losses[self.a]+loss
            self.plays[self.a]=self.plays[self.a]+1
         self.n=self.n+1
         logging.info("Bandit: the total plays are:%s" %str(self.plays))
-        logging.info("Bandit: the estimated losses are:%s" %str([l/p for l,p in zip(self.losses,self.plays)]))
+        logging.info("Bandit: the estimated losses are:%s" %str([l/(max(1,p)) for l,p in zip(self.losses,self.plays)]))
         if self.n <= self.k:
             self.a = self.n-1
         else:
@@ -138,17 +133,21 @@ class EpsGreedyBandit(object):
 class BanditController(object):
     """Implements a bandit control loop for resource management."""
 
-    def __init__(self, actuators, initialization_rounds=20, exploration=0.2, enforce=None):
+    def __init__(self, actuators, initialization_rounds=20,
+            exploration=0.2, enforce=None, log_power=None):
         self.actuators = actuators
         self.initialization_rounds = initialization_rounds
         self.actions = [a for a in itertools.product(*[act.available_actions() for act in actuators])]
-        self.loss = BasicPowerLoss(1,-1)
+        self.loss = BasicPowerLoss(0.5)
         self.bandit = EpsGreedyBandit(exploration,len(self.actions))
         self.n=0
-        if enforce!=None: 
+        if enforce is not None: 
             assert(enforce>=0)
             assert(enforce<len(self.actions))
         self.enforce=enforce
+        self.log_power=log_power
+        if self.log_power is not  None:
+            self.log_power.write("progress power loss a desc")
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
@@ -157,11 +156,12 @@ class BanditController(object):
         self.n=self.n+1
         total_progress = sum([a.progress for a in applications.values()])
         total_power = float(machineinfo['energy']['power']['p0'])
-        logger.info("Controller:MACHINEINFO %s." %(str(machineinfo)))
-        logger.info("Controller: Reading progress %s and power %s." %(total_progress,total_power))
+        logger.info("Controller: Reading machineinfo %s." %(str(machineinfo)))
+        logger.info("Controller: Reading progress %s and power %s." 
+                %(total_progress,total_power))
         loss = self.loss.loss(progress=total_progress,power=total_power)
-        logger.info("Controller: Computing loss %s." %loss)
-        if self.enforce!=None:
+        logger.info("Controller: Incurring loss %s." %loss)
+        if self.enforce is not None:
             logger.info("Controller: enforced action.")
             a=self.enforce
         if self.n>self.initialization_rounds:
@@ -171,7 +171,12 @@ class BanditController(object):
             logger.info("Controller: estimating max power/max progress ranges.")
             a=self.n % len(self.actions)
         action = self.actions[a]
-        logger.info("Controller: playing arm id %s (powercap '%s')." %(str(a),str([act.command for act in list(action)])))
+        logger.info("Controller: playing arm id %s (powercap '%s')." 
+                %(str(a),str([act.command for act in list(action)])))
+        if self.log_power is not None:
+            self.log_power.write("%s %s %s %s %s\n" 
+                    %(str(total_progress),str(total_power),str(loss),
+                        str(a),str([act.command for act in list(action)])))
         return(list(action),self.actuators)
 
     def execute(self, actions, actuators):

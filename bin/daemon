@@ -1,7 +1,43 @@
 #!/usr/bin/env python2
+"""NRM Daemon.
 
+Usage:
+  daemon bandit 
+    [-k <k> | --discretization=<k>] [-l <watts> | --lowerboundwatts=<watts>] 
+    [-e <eps> | --epsilon=<eps>] [-o <k> | --log_power=<log>]
+  daemon enforce <policy> 
+    [-k <k> | --discretization <k>] [-l <watts> | --lowerboundwatts <watts>]
+    [-o <k> | --log_power=<log>]
+
+Arguments:
+  <policy>                              The powercontrol policy to enforce. [default: None]
+
+Options:
+  -h --help                             Show this screen.
+  -k <k> --discretization=<k>           The discretization count to use in powercontrol. 
+                                        [default: 4]
+  -l <watts> --lowerboundwatts=<watts>  The minimum cpu wattage allowed. [default: 100]
+  -e <eps> --epsilon=<eps>              The exploration constant for bandit powercontrol. 
+                                        [default: 0.1]
+  -o <log> --log_power=<log>            The log file for power use.
+
+Try: daemon bandit -k 4 -l 100 -e 0.1 
+     daemon bandit -k 4 -l 100 -e 1 #random bandit
+     daemon enforce 0 -k 2 #enforce the lower bound
+     daemon enforce 1 -k 2 #enforce the maximum
+
+"""
+from docopt import docopt
 import nrm
 import nrm.daemon
 
 if __name__ == "__main__":
-    nrm.daemon.runner()
+  arguments = docopt(__doc__, version='Naval Fate 2.0')
+  print(arguments)
+  if arguments["enforce"]:
+      arguments["<policy>"]=int(arguments["<policy>"])
+  nrm.daemon.runner(power_discretization=int(arguments["--discretization"]),
+          enforce_powerpolicy=arguments["<policy>"],
+          exploration_constant=float(arguments["--epsilon"]),
+          lowerboundwatts=int(arguments["--lowerboundwatts"]),
+          log_power=arguments["--log_power"])

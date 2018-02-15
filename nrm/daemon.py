@@ -18,8 +18,17 @@ logger = logging.getLogger('nrm')
 
 
 class Daemon(object):
-    def __init__(self):
+    def __init__(self,power_discretization=4,
+            enforce_powerpolicy=False,
+            lowerboundwatts=100,
+            exploration_constant=0.1,
+            log_power=None):
         self.target = 100.0
+        self.log_power = log_power
+        self.k = power_discretization
+        self.eps = exploration_constant
+        self.enforce = enforce_powerpolicy
+        self.lowerboundwatts = lowerboundwatts
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -220,8 +229,9 @@ class Daemon(object):
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
         # aa = ApplicationActuator(self.application_manager, self.downstream_pub)
-        pa = DiscretizedPowerActuator(self.sensor_manager,lowerboundwatts=100,k=4)
-        self.controller = BanditController([pa])
+        pa = DiscretizedPowerActuator(self.sensor_manager,lowerboundwatts=self.lowerboundwatts,k=self.k)
+        self.controller = BanditController([pa],enforce=self.enforce,
+                exploration=self.eps,log_power=self.log_power)
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()
@@ -240,8 +250,23 @@ class Daemon(object):
         ioloop.IOLoop.current().start()
 
 
-def runner():
+def runner(power_discretization=4,
+        enforce_powerpolicy=False,
+        lowerboundwatts=100,
+        exploration_constant=0.1,
+        log_power=None):
     ioloop.install()
     logging.basicConfig(level=logging.DEBUG)
-    daemon = Daemon()
-    daemon.main()
+    if log_power is not None: log_power=open(log_power,'r')
+    try:
+        daemon = Daemon(power_discretization=power_discretization,
+                enforce_powerpolicy=enforce_powerpolicy,
+                lowerboundwatts=lowerboundwatts,
+                exploration_constant=exploration_constant,
+                log_power=log_power)
+        daemon.main()
+        if log_power!=None:
+          close(log_power,'r')
+    except:
+        if log_power!=None:
+          close(log_power,'r')
