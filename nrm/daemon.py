@@ -22,9 +22,11 @@ class Daemon(object):
             enforce_powerpolicy=False,
             lowerboundwatts=100,
             exploration_constant=0.1,
-            log_power=None):
+            log_power=None,
+            period=5000):
         self.target = 100.0
         self.log_power = log_power
+        self.period = period
         self.k = power_discretization
         self.eps = exploration_constant
         self.enforce = enforce_powerpolicy
@@ -237,10 +239,10 @@ class Daemon(object):
         self.machine_info = self.sensor_manager.do_update()
 
         # setup periodic sensor updates
-        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, 1000)
+        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, self.period)
         self.sensor_cb.start()
 
-        self.control = ioloop.PeriodicCallback(self.do_control, 1000)
+        self.control = ioloop.PeriodicCallback(self.do_control, self.period)
         self.control.start()
 
         # take care of signals
@@ -254,10 +256,11 @@ def runner(power_discretization=4,
         enforce_powerpolicy=False,
         lowerboundwatts=100,
         exploration_constant=0.1,
-        log_power=None):
+        log_power=None,
+        period=5000):
     ioloop.install()
     logging.basicConfig(level=logging.DEBUG)
-    if log_power is not None: log_power=open(log_power,'r')
+    if log_power is not None: log_power=open(log_power,'w',0)
     try:
         daemon = Daemon(power_discretization=power_discretization,
                 enforce_powerpolicy=enforce_powerpolicy,

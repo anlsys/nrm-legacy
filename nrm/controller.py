@@ -147,7 +147,7 @@ class BanditController(object):
         self.enforce=enforce
         self.log_power=log_power
         if self.log_power is not  None:
-            self.log_power.write("progress power loss a desc")
+            self.log_power.write("progress power loss a desc\n")
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
@@ -155,6 +155,9 @@ class BanditController(object):
             return([],[])
         self.n=self.n+1
         total_progress = sum([a.progress for a in applications.values()])
+        for a in applications.values():
+          a.reset_progress()
+        logger.info("Controller: applications %r" %applications.values())
         total_power = float(machineinfo['energy']['power']['p0'])
         logger.info("Controller: Reading machineinfo %s." %(str(machineinfo)))
         logger.info("Controller: Reading progress %s and power %s." 
@@ -164,7 +167,7 @@ class BanditController(object):
         if self.enforce is not None:
             logger.info("Controller: enforced action.")
             a=self.enforce
-        if self.n>self.initialization_rounds:
+        elif self.n>self.initialization_rounds:
             logger.info("Controller: playing bandit.")
             a=self.bandit.next(loss)
         else:

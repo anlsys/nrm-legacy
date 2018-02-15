@@ -22,7 +22,7 @@ class Application(object):
     def __init__(self, uuid, container, progress, threads):
         self.uuid = uuid
         self.container_uuid = container
-        self.progress = progress
+        self.progress = 1
         self.threads = threads
         self.thread_state = 'stable'
 
@@ -59,7 +59,7 @@ class Application(object):
         """Update the progress tracking."""
         self.progress = self.progress + float(msg['payload'])
 
-    def reset_progress(self, msg):
+    def reset_progress(self):
         """Update the progress tracking."""
         self.progress = 0
 

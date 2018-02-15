@@ -5,12 +5,14 @@ Usage:
   daemon bandit 
     [-k <k> | --discretization=<k>] [-l <watts> | --lowerboundwatts=<watts>] 
     [-e <eps> | --epsilon=<eps>] [-o <k> | --log_power=<log>]
-  daemon enforce <policy> 
+    [-p <period> | --period=<period>]
+  daemon enforce <enforce> 
     [-k <k> | --discretization <k>] [-l <watts> | --lowerboundwatts <watts>]
-    [-o <k> | --log_power=<log>]
+    [-o <n> | --log_power=<log>]
+    [-p <period> | --period=<period>]
 
 Arguments:
-  <policy>                              The powercontrol policy to enforce. [default: None]
+  <enforce>                              The powercontrol policy to enforce. [default: None]
 
 Options:
   -h --help                             Show this screen.
@@ -20,6 +22,7 @@ Options:
   -e <eps> --epsilon=<eps>              The exploration constant for bandit powercontrol. 
                                         [default: 0.1]
   -o <log> --log_power=<log>            The log file for power use.
+  -p <period> --period=<period>         The period for power control.
 
 Try: daemon bandit -k 4 -l 100 -e 0.1 
      daemon bandit -k 4 -l 100 -e 1 #random bandit
@@ -35,9 +38,12 @@ if __name__ == "__main__":
   arguments = docopt(__doc__, version='Naval Fate 2.0')
   print(arguments)
   if arguments["enforce"]:
-      arguments["<policy>"]=int(arguments["<policy>"])
+      arguments["<enforce>"]=int(arguments["<enforce>"])
+  if arguments["--period"] is not None:
+      arguments["--period"]=int(arguments["--period"])
   nrm.daemon.runner(power_discretization=int(arguments["--discretization"]),
-          enforce_powerpolicy=arguments["<policy>"],
+          enforce_powerpolicy=arguments["<enforce>"],
           exploration_constant=float(arguments["--epsilon"]),
           lowerboundwatts=int(arguments["--lowerboundwatts"]),
-          log_power=arguments["--log_power"])
+          log_power=arguments["--log_power"],
+          period=arguments["--period"])
