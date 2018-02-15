@@ -152,6 +152,8 @@ class BanditController(object):
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
+        if len(applications)==0:
+            return([],[])
         self.n=self.n+1
         total_progress = sum([a.progress for a in applications.values()])
         total_power = float(machineinfo['energy']['power']['p0'])
