@@ -139,6 +139,7 @@ class BanditController(object):
         self.initialization_rounds = initialization_rounds
         self.actions = [a for a in itertools.product(*[act.available_actions() for act in actuators])]
         self.loss = BasicPowerLoss(0.5)
+        self.exploration=exploration
         self.bandit = EpsGreedyBandit(exploration,len(self.actions))
         self.n=0
         if enforce is not None: 
@@ -148,10 +149,16 @@ class BanditController(object):
         self.log_power=log_power
         if self.log_power is not  None:
             self.log_power.write("progress power loss a desc\n")
+            self.log_power.flush()
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
         if len(applications)==0:
+            self.bandit = EpsGreedyBandit(self.exploration,len(self.actions))
+            self.n=0
+            if self.log_power is not  None:
+                self.log_power.write("new application\n")
+                self.log_power.flush()
             return([],[])
         self.n=self.n+1
         total_progress = sum([a.progress for a in applications.values()])
@@ -180,6 +187,7 @@ class BanditController(object):
             self.log_power.write("%s %s %s %s %s\n" 
                     %(str(total_progress),str(total_power),str(loss),
                         str(a),str([act.command for act in list(action)])))
+            self.log_power.flush()
         return(list(action),self.actuators)
 
     def execute(self, actions, actuators):
