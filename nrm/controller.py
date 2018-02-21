@@ -165,7 +165,7 @@ class BanditController(object):
         for a in applications.values():
           a.reset_progress()
         logger.info("Controller: applications %r" %applications.values())
-        total_power = float(machineinfo['energy']['power']['p0'])
+        total_power = float(machineinfo['energy']['energy']['p0'])/(1000*1000) #in joules
         logger.info("Controller: Reading machineinfo %s." %(str(machineinfo)))
         logger.info("Controller: Reading progress %s and power %s." 
                 %(total_progress,total_power))
