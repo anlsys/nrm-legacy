@@ -269,7 +269,7 @@ def runner(power_discretization=4,
                 log_power=log_power)
         daemon.main()
         if log_power!=None:
-          close(log_power,'r')
+          log_power.close()
     except:
         if log_power!=None:
-          close(log_power,'r')
+          log_power.close()

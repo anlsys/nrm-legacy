@@ -57,7 +57,7 @@ class Application(object):
 
     def update_progress(self, msg):
         """Update the progress tracking."""
-        self.progress = self.progress + float(msg['payload'])
+        self.progress = self.progress + float(msg['payload'])/10000.
 
     def reset_progress(self):
         """Update the progress tracking."""

@@ -1,6 +1,7 @@
 """Various clients for system utilities."""
 import collections
 import logging
+import os
 import xml.etree.ElementTree
 import tornado.process as process
 import subprocess
@@ -42,7 +43,12 @@ class NodeOSClient(object):
 
     def __init__(self):
         """Load client configuration."""
-        self.prefix = "argo_nodeos_config"
+        if 'ARGO_NODEOS_CONFIG' in os.environ:
+            logger.warning("NodeOSClient: bypassing argo_nodeos_config with %s\n" %os.environ['ARGO_NODEOS_CONFIG'])
+            self.prefix=os.environ['ARGO_NODEOS_CONFIG']
+        else:
+            logger.warning("NodeOSClient: using argo_nodeos_config from path")
+            self.prefix = "argo_nodeos_config"
 
     def getavailable(self):
         """Gather available resources."""
