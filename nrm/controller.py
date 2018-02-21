@@ -68,9 +68,9 @@ class DiscretizedPowerActuator(object):
         pl = self.sensor_manager.get_powerlimits()
         logger.info("BanditPowerActuator: power limits %r", pl)
         maxW = int(pl[[k for k,i in pl.items()][0]]['maxW'])
-        if maxW > self.lowerboundwatts:
+        if maxW < self.lowerboundwatts:
             logger.error( "BanditPowerActuator: The provided power lowerbound is"\
-            "lower than the available maximum CPU wattage.")
+            "higher than the available maximum CPU wattage.")
         rangeW=maxW-self.lowerboundwatts
         arms = [self.lowerboundwatts + (float(a)*rangeW/float(self.k)) for a in range(1,self.k+1)]
         logger.info("BanditPowerActuator: discretized power limits: %r:", arms)
