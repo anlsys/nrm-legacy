@@ -133,11 +133,11 @@ class EpsGreedyBandit(object):
 class BanditController(object):
     """Implements a bandit control loop for resource management."""
 
-    def __init__(self, actuators, initialization_rounds=20,
+    def __init__(self, actuators, initialization_rounds=None,
             exploration=0.2, enforce=None, log_power=None):
         self.actuators = actuators
-        self.initialization_rounds = initialization_rounds
         self.actions = [a for a in itertools.product(*[act.available_actions() for act in actuators])]
+        self.initialization_rounds = len(self.actions)*2
         self.loss = BasicPowerLoss(0.5)
         self.exploration=exploration
         self.bandit = EpsGreedyBandit(exploration,len(self.actions))
