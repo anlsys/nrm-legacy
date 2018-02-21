@@ -95,7 +95,7 @@ class BasicPowerLoss(object):
         if progress>self.progress_max: self.progress_max = progress
         power_n=power/max(0.001, self.power_max)
         progress_n=progress/max(0.001, self.progress_max)
-        return(self.alpha*power_n + (1-self.alpha)*progress_n)
+        return(1. + 0.5 * (self.alpha* power_n + (self.alpha-1)*progress_n))
 
 class EpsGreedyBandit(object):
     """Epsilon greedy bandit. Actions in O,..,k-1."""
@@ -113,8 +113,6 @@ class EpsGreedyBandit(object):
 
     def next(self, loss):
         assert(loss >= 0)
-        # logging.info("NEXT0!! Arriving with self.n :%s" %str(self.n))
-        # logging.info("NEXT0!! Arriving with self.a :%s" %str(self.a))
         if self.a is not None:
            self.losses[self.a]=self.losses[self.a]+loss
            self.plays[self.a]=self.plays[self.a]+1
