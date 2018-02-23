@@ -152,7 +152,7 @@ class BanditController(object):
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
-        current_e = float(machineinfo['energy']['cumulative']['p0'])/(1000*1000) # in joules
+        current_e = float(machineinfo['energy']['cumulative']['package-0'])/(1000*1000) # in joules
         if self.last_e==0:
             self.last_e=current_e
             return([],[])
