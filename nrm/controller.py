@@ -139,6 +139,7 @@ class BanditController(object):
         self.loss = BasicPowerLoss(0.5)
         self.exploration=exploration
         self.bandit = EpsGreedyBandit(exploration,len(self.actions))
+        self.last_e=0
         self.n=0
         if enforce is not None: 
             assert(enforce>=0)
@@ -151,6 +152,14 @@ class BanditController(object):
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
+        current_e = float(machineinfo['energy']['total']['p0'])/(1000*1000) # in joules
+        if self.last_e==0:
+            self.last_e=current_e
+            return([],[])
+        else:
+            total_power = current_e - self.last_e
+            self.last_e = current_e
+        logger.info("Controller: Reading machineinfo %s." %(str(machineinfo)))
         if len(applications)==0:
             self.bandit = EpsGreedyBandit(self.exploration,len(self.actions))
             self.n=0
@@ -163,8 +172,6 @@ class BanditController(object):
         for a in applications.values():
           a.reset_progress()
         logger.info("Controller: applications %r" %applications.values())
-        total_power = float(machineinfo['energy']['energy']['p0'])/(1000*1000) #in joules
-        logger.info("Controller: Reading machineinfo %s." %(str(machineinfo)))
         logger.info("Controller: Reading progress %s and power %s." 
                 %(total_progress,total_power))
         loss = self.loss.loss(progress=total_progress,power=total_power)

@@ -138,6 +138,7 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
+        self.do_sensor()
         actions, actuators = self.controller.planify(self.target, self.machine_info, self.application_manager.applications)
         self.controller.execute(actions, actuators)
         self.controller.update(actions, actuators)
@@ -239,8 +240,8 @@ class Daemon(object):
         self.machine_info = self.sensor_manager.do_update()
 
         # setup periodic sensor updates
-        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, self.period / 5)
-        self.sensor_cb.start()
+        # self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, self.period / 5)
+        # self.sensor_cb.start()
 
         self.control = ioloop.PeriodicCallback(self.do_control, self.period)
         self.control.start()

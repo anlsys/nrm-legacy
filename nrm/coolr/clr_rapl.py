@@ -231,6 +231,7 @@ class rapl_reader:
 
         ret = dict()
         ret['energy'] = dict()
+        ret['energy']['total'] = self.totalenergy
         for k in sorted(e.keys()):
             if k != 'time':
                 ret['energy'][self.shortenkey(k)] = de[k]
