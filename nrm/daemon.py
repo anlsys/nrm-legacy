@@ -239,7 +239,7 @@ class Daemon(object):
         self.machine_info = self.sensor_manager.do_update()
 
         # setup periodic sensor updates
-        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, self.period)
+        self.sensor_cb = ioloop.PeriodicCallback(self.do_sensor, self.period / 5)
         self.sensor_cb.start()
 
         self.control = ioloop.PeriodicCallback(self.do_control, self.period)

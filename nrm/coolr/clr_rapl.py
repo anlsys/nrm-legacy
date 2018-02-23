@@ -233,7 +233,7 @@ class rapl_reader:
         ret['energy'] = dict()
         for k in sorted(e.keys()):
             if k != 'time':
-                ret['energy'][self.shortenkey(k)] = e[k]
+                ret['energy'][self.shortenkey(k)] = de[k]
 
         ret['power'] = dict()
         totalpower = 0.0
