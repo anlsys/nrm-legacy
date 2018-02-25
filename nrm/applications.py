@@ -22,7 +22,8 @@ class Application(object):
     def __init__(self, uuid, container, progress, threads):
         self.uuid = uuid
         self.container_uuid = container
-        self.progress = 1
+        self.progress = 0
+        self.hardwareprogress = 0
         self.threads = threads
         self.thread_state = 'stable'
 
@@ -57,11 +58,15 @@ class Application(object):
 
     def update_progress(self, msg):
         """Update the progress tracking."""
-        self.progress = self.progress + float(msg['payload'])/10000.
+        if msg['event']=='progress':
+            self.progress = self.progress + float(msg['payload'])
+        elif msg['event']=='hardwareprogress':
+            self.hardwareprogress = self.hardwareprogress + float(msg['payload'])/10000.
 
     def reset_progress(self):
         """Update the progress tracking."""
         self.progress = 0
+        self.hardwareprogress = 0
 
 class ApplicationManager(object):
 

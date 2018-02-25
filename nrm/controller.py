@@ -147,12 +147,13 @@ class BanditController(object):
         self.enforce=enforce
         self.log_power=log_power
         if self.log_power is not  None:
-            self.log_power.write("progress power loss a desc\n")
+            self.log_power.write("hardwareprogress progress power loss a desc p_inst\n")
             self.log_power.flush()
 
     def planify(self, target, machineinfo, applications):
         """Plan the next action for the control loop."""
         current_e = float(machineinfo['energy']['energy']['cumulative']['package-0'])/(1000*1000) # in joules
+        current_p = float(machineinfo['energy']['power']['p0'])/(1000*1000) # in joules
         if self.last_e==0:
             self.last_e=current_e
             return([],[])
@@ -169,6 +170,7 @@ class BanditController(object):
             return([],[])
         self.n=self.n+1
         total_progress = sum([a.progress for a in applications.values()])
+        total_hardwareprogress = sum([a.hardwareprogress for a in applications.values()])
         for a in applications.values():
           a.reset_progress()
         logger.info("Controller: applications %r" %applications.values())
@@ -189,9 +191,9 @@ class BanditController(object):
         logger.info("Controller: playing arm id %s (powercap '%s')." 
                 %(str(a),str([act.command for act in list(action)])))
         if self.log_power is not None:
-            self.log_power.write("%s %s %s %s %s\n" 
-                    %(str(total_progress),str(total_power),str(loss),
-                        str(a),str([act.command for act in list(action)])))
+            self.log_power.write("%s %s %s %s %s %s %s\n" 
+                    %(str(total_hardwareprogress),str(total_progress),str(total_power),str(loss),
+                        str(a),str([act.command for act in list(action)]),current_p))
             self.log_power.flush()
         return(list(action),self.actuators)
 
