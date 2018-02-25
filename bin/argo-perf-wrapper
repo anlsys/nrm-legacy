@@ -30,7 +30,7 @@ class PerfWrapper(object):
 
     def progress_report(self, progress):
         update = {'type': 'application',
-                  'event': 'progress',
+                  'event': 'hardwareprogress',
                   'payload': progress,
                   'uuid': self.app_uuid,
                   }
