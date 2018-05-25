@@ -1,0 +1,8 @@
+stages:
+  - test
+
+py.test:
+  stage: test
+  script:
+    - pipenv install --dev
+    - pipenv run py.test
