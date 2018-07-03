@@ -125,6 +125,7 @@ class Container(SpecField):
         """Load container information."""
         return super(Container, self).load(data)
 
+
 class PerfWrapper(SpecField):
 
     """Information on whether to use perf for a container."""
@@ -146,6 +147,7 @@ class PerfWrapper(SpecField):
                          self.enabled)
             return False
         return True
+
 
 class IsolatorList(SpecField):
 
