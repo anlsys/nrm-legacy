@@ -1,8 +1,15 @@
 stages:
   - test
+  - style
 
 py.test:
   stage: test
   script:
     - pipenv install --dev
     - pipenv run py.test
+
+flake8:
+  stage: style
+  script:
+    - pipenv install --dev
+    - pipenv run flake8

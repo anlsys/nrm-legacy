@@ -74,7 +74,8 @@ class PowerActuator(object):
         return actions
 
     def execute(self, action):
-        logger.info("changing power limit: %r, %r", action.command, action.delta)
+        logger.info("changing power limit: %r, %r", action.command,
+                    action.delta)
         self.sensor_manager.set_powerlimit(action.target, action.command)
 
     def update(self, action):
