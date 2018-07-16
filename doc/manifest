@@ -23,6 +23,13 @@
 				"value": {
 					 "enabled": "1"
 				}
+			},
+			{
+				"name": "argo/powerpolicy",
+				"value": {
+					"enabled": "0",
+					"policy": "NONE"
+				}
 			}
 		]
 	}
