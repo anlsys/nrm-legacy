@@ -149,13 +149,44 @@ class PerfWrapper(SpecField):
         return True
 
 
+class PowerPolicy(SpecField):
+
+    """Information on whether to use power policy for a container."""
+
+    policies = ['NONE', 'DDCM', 'DVFS', 'COMBINED']
+
+    fields = {"enabled": spec(unicode, False),
+              "policy": spec(unicode, False)
+              }
+
+    def __init__(self):
+        """Create empty perf wrapper."""
+        pass
+
+    def load(self, data):
+        """Load perf wrapper information."""
+        ret = super(PowerPolicy, self).load(data)
+        if not ret:
+            return ret
+        if self.enabled not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value of powerpolicy enabled: %s",
+                         self.enabled)
+            return False
+        if self.policy not in self.policies:
+            logger.error("Invalid value of powerpolicy policy: %s",
+                         self.policy)
+            return False
+        return True
+
+
 class IsolatorList(SpecField):
 
     """Represent the list of isolator in a Manifest."""
 
     types = {"argo/scheduler": spec(Scheduler, False),
              "argo/container": spec(Container, True),
-             "argo/perfwrapper": spec(PerfWrapper, False)
+             "argo/perfwrapper": spec(PerfWrapper, False),
+             "argo/powerpolicy": spec(PowerPolicy, False)
              }
 
     def __init__(self):
