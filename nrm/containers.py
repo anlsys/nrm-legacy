@@ -50,6 +50,8 @@ class ContainerManager(object):
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
         logger.info("run: environ: %r", environ)
+        # TODO: Application library to load must be set during configuration
+        applicationpreloadlibrary = '.so'
 
         # create container
         container_name = request['uuid']
@@ -73,6 +75,12 @@ class ContainerManager(object):
             if hasattr(manifest.app.isolators.perfwrapper, 'enabled'):
                 if manifest.app.isolators.perfwrapper.enabled in ["1", "True"]:
                     argv.append('argo-perf-wrapper')
+
+        if hasattr(manifest.app.isolators, 'powerpolicy'):
+            if hasattr(manifest.app.isolators.powerpolicy, 'enabled'):
+                if manifest.app.isolators.powerpolicy.enabled in ["1", "True"]:
+                    if manifest.app.isolators.powerpolicy.policy != "NONE":
+                        environ['LD_PRELOAD'] = applicationpreloadlibrary
 
         argv.append(command)
         argv.extend(args)
