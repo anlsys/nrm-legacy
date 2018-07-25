@@ -191,6 +191,14 @@ class Power(SpecField):
             logger.error("Invalid value for power policy slowdown: %s",
                          self.policy)
             return False
+        if self.damper < 0.0:
+            logger.error("Invalid value of powerpolicy damper: %s",
+                         self.policy)
+            return False
+        if self.slowdown < 1.0:
+            logger.error("Invalid value of powerpolicy slowdown: %s",
+                         self.policy)
+            return False
         return True
 
 

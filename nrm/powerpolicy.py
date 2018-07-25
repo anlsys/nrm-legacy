@@ -37,7 +37,8 @@ logger = logging.getLogger('nrm')
 class PowerPolicyManager:
     """ Used for power policy application """
 
-    def __init__(self, cpus=None, policy=None, damper=0.1, slowdown=1.1):
+    def __init__(self, cpus=None, policy=None, damper=1000000000,
+                 slowdown=1.1):
         self.cpus = cpus
         self.policy = policy
         self.damper = damper
@@ -56,7 +57,7 @@ class PowerPolicyManager:
         # Book-keeping
         self.damperexits = 0
         self.slowdownexits = 0
-        self.prevtolalphasetime = 10000.0   # Any large value
+        self.prevtolalphasetime = dict.fromkeys(self.cpus, None)
 
     def run_policy(self, phase_contexts):
         # Run only if policy is specified
@@ -69,17 +70,19 @@ class PowerPolicyManager:
                 # Select and invoke appropriate power policy
                 # TODO: Need to add a better policy selection logic in addition
                 # to user specified using manifest file
-                ret, value = self.invoke_policy(id, **phase_contexts[id])
-                if self.policy == 'DDCM' and ret in ['DDCM', 'SLOWDOWN']:
-                    self.dclevel[id] = value
+                ret, value = self.execute(id, **phase_contexts[id])
+                if self.policy == 'DDCM':
+                    if ret == 'DDCM':
+                        self.dclevel[id] = value
+                    # Incase of slowdown experienced by even process, reset all
+                    # cpus
+                    if ret == 'SLOWDOWN':
+                        self.reset_all()
                 phase_contexts[id]['set'] = False
 
-    def invoke_policy(self, cpu, **kwargs):
-        # Calculate time spent in computation, barrier in current phase along
-        # with total phase time
-        computetime = kwargs['endcompute'] - kwargs['startcompute']
-        barriertime = kwargs['endbarrier'] - kwargs['startbarrier']
-        totalphasetime = computetime + barriertime
+    def execute(self, cpu, **kwargs):
+        computetime = kwargs['computetime']
+        totalphasetime = kwargs['totaltime']
 
         # If the current phase length is less than the damper value, then do
         # not use policy. This avoids use of policy during startup operation
@@ -88,16 +91,16 @@ class PowerPolicyManager:
             self.damperexits += 1
             return 'DAMPER', -1
 
-        # Reset value for next phase
-        self.prevtolalphasetime = totalphasetime
-
         # If the current phase has slowed down beyond the threshold set, then
         # reset power. This helps correct error in policy application or acts
         # as a rudimentary way to detect phase change
-        if(self.dclevel[cpu] < self.ddcmpolicy.maxdclevel and totalphasetime >
-                self.slowdown * self.prevtolalphasetime):
+        if(self.prevtolalphasetime[cpu] is not None and totalphasetime >
+           self.slowdown * self.prevtolalphasetime[cpu]):
             self.ddcmpolicy.dc.reset(cpu)
             newdclevel = self.ddcmpolicy.maxdclevel
+
+            # Reset value for next phase
+            self.prevtolalphasetime[cpu] = totalphasetime
 
             return 'SLOWDOWN', newdclevel
 
@@ -105,6 +108,8 @@ class PowerPolicyManager:
         if self.policy == "DDCM":
             newdclevel = self.ddcmpolicy.execute(cpu, self.dclevel[cpu],
                                                  computetime, totalphasetime)
+            # Reset value for next phase
+            self.prevtolalphasetime[cpu] = totalphasetime
 
         # TODO: Add DVFS and Combined policies
 
@@ -112,18 +117,21 @@ class PowerPolicyManager:
 
     def print_policy_stats(self, resetflag=False):
         # Get statistics for policy run
-        print('PowerPolicyManager: DamperExits %d SlowdownExits %d' %
-              (self.damperexits, self.slowdownexits))
-        self.ddcmpolicy.print_stats(resetflag)
-
+        ppstats = dict()
+        ppstats['PowerPolicyDamperExits'] = self.damperexits
+        ppstats['PowerPolicySlowdownExits'] = self.slowdownexits
+        ppstats.update(self.ddcmpolicy.print_stats(resetflag))
         if resetflag:
             self.damperexits = 0
             self.slowdownexits = 0
 
+        return ppstats
+
     def power_reset(self, cpu):
-        # Reset all power controls
+        # Reset power control
         self.ddcmpolicy.dc.reset(cpu)
 
+        # Reset value
         self.dclevel[cpu] = self.maxdclevel
 
     def power_check(self, cpu):

@@ -64,9 +64,9 @@ class Application(object):
 
     def update_phase_context(self, msg):
         """Update the phase contextual information."""
-        id = msg.cpu
-        self.phase_contexts[id] = {k: getattr(msg, k) for k in ('startcompute',
-                                   'endcompute', 'startbarrier', 'endbarrier')}
+        id = int(msg['cpu'])
+        self.phase_contexts[id] = {k: int(msg[k]) for k in ('aggregation',
+                                   'computetime', 'totaltime')}
         self.phase_contexts[id]['set'] = True
 
 
@@ -85,8 +85,7 @@ class ApplicationManager(object):
         progress = 0
         threads = False
         phase_contexts = dict()
-        phase_context_keys = ['set', 'startcompute', 'endcompute',
-                              'startbarrier', 'endbarrier']
+        phase_context_keys = ['set', 'aggregation', 'computetime', 'totaltime']
         if container.power['policy']:
             ids = container.resources['cpus']
             for id in ids:

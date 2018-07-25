@@ -124,19 +124,31 @@ class Controller(object):
         """Update tracking across the board to reflect the last action."""
         actuator.update(action)
 
+    def run_policy_container(self, container, application):
+        """Run policies on a container."""
+        ids = container.resources['cpus']
+        pcs = application.phase_contexts
+        # Run policy only if all phase contexts have been received
+        if not filter(lambda i: not pcs[i]['set'], ids):
+            # Only run policy if all phase contexts are an
+            # aggregation of same number of phases
+            aggs = [pcs[i]['aggregation'] for i in ids]
+            if aggs.count(aggs[0]) == len(aggs):
+                container.power['manager'].run_policy(pcs)
+                if filter(lambda i: pcs[i]['set'], ids):
+                    logger.debug("Phase context not reset %r", application)
+            else:
+                container.power['manager'].reset_all()
+                for i in ids:
+                    pcs[i]['set'] = False
+
     def run_policy(self, containers):
         """Run policies on containers with policies set."""
         for container in containers:
-            pp = containers[container].power
-            if pp['policy']:
+            p = containers[container].power
+            if p['policy']:
                 apps = self.actuators[0].application_manager.applications
                 if apps:
                     app = next(apps[a] for a in apps if apps[a].container_uuid
                                == container)
-                    ids = containers[container].resources['cpus']
-                    # Run policy only if all phase contexts have been received
-                    if not filter(lambda i: not app.phase_contexts[i]['set'],
-                                  ids):
-                        pp['manager'].run_policy(app.phase_contexts)
-                        if filter(lambda i: app.phase_contexts[i]['set'], ids):
-                            logger.debug("Phase context not reset %r", app)
+                    self.run_policy_container(containers[container], app)

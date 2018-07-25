@@ -230,20 +230,24 @@ class Daemon(object):
                                'container_uuid': container.uuid,
                                'profile_data': dict(),
                                }
-                        pp = container.power
-                        if pp['policy']:
-                            pp['manager'].reset_all()
-                        if pp['profile']:
-                            e = pp['profile']['end']
+                        p = container.power
+                        if p['policy']:
+                            p['manager'].reset_all()
+                        if p['profile']:
+                            e = p['profile']['end']
                             self.machine_info = self.sensor_manager.do_update()
                             e = self.machine_info['energy']['energy']
                             e['time'] = self.machine_info['time']
-                            s = pp['profile']['start']
+                            s = p['profile']['start']
                             # Calculate difference between the values
                             diff = self.sensor_manager.calc_difference(s, e)
                             # Get final package temperature
                             temp = self.machine_info['temperature']
                             diff['temp'] = map(lambda k: temp[k]['pkg'], temp)
+                            diff['policy'] = p['policy']
+                            if p['policy']:
+                                diff['damper'] = float(p['damper'])/1000000000
+                                diff['slowdown'] = p['slowdown']
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff
