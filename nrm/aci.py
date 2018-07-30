@@ -156,7 +156,9 @@ class PowerPolicy(SpecField):
     policies = ['NONE', 'DDCM', 'DVFS', 'COMBINED']
 
     fields = {"enabled": spec(unicode, False),
-              "policy": spec(unicode, False)
+              "policy": spec(unicode, False),
+              "damper": spec(unicode, False),
+              "slowdown": spec(unicode, False)
               }
 
     def __init__(self):
@@ -174,6 +176,14 @@ class PowerPolicy(SpecField):
             return False
         if self.policy not in self.policies:
             logger.error("Invalid value of powerpolicy policy: %s",
+                         self.policy)
+            return False
+        if self.damper < 0.0:
+            logger.error("Invalid value of powerpolicy damper: %s",
+                         self.policy)
+            return False
+        if self.slowdown < 1.0:
+            logger.error("Invalid value of powerpolicy slowdown: %s",
                          self.policy)
             return False
         return True

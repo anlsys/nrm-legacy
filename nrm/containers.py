@@ -50,8 +50,6 @@ class ContainerManager(object):
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
         logger.info("run: environ: %r", environ)
-        # TODO: Application library to load must be set during configuration
-        applicationpreloadlibrary = '.so'
 
         # create container
         container_name = request['uuid']
@@ -59,6 +57,14 @@ class ContainerManager(object):
         logger.info("creating container %s", container_name)
         self.nodeos.create(container_name, allocation)
         logger.info("created container %s", container_name)
+
+        # Container power policy information
+        container_powerpolicy = dict()
+        container_powerpolicy['policy'] = None
+        container_powerpolicy['damper'] = None
+        container_powerpolicy['slowdown'] = None
+        # TODO: Application library to load must be set during configuration
+        applicationpreloadlibrary = ''
 
         # run my command
         if hasattr(manifest.app.isolators, 'scheduler'):
@@ -78,9 +84,13 @@ class ContainerManager(object):
 
         if hasattr(manifest.app.isolators, 'powerpolicy'):
             if hasattr(manifest.app.isolators.powerpolicy, 'enabled'):
-                if manifest.app.isolators.powerpolicy.enabled in ["1", "True"]:
-                    if manifest.app.isolators.powerpolicy.policy != "NONE":
-                        environ['LD_PRELOAD'] = applicationpreloadlibrary
+                    pp = manifest.app.isolators.powerpolicy
+                    if pp.enabled in ["1", "True"]:
+                        if pp.policy != "NONE":
+                            container_powerpolicy['policy'] = pp.policy
+                            container_powerpolicy['damper'] = pp.damper
+                            container_powerpolicy['slowdown'] = pp.slowdown
+                            environ['LD_PRELOAD'] = applicationpreloadlibrary
 
         argv.append(command)
         argv.extend(args)
