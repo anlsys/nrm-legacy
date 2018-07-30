@@ -65,6 +65,7 @@ class ContainerManager(object):
         container_powerpolicy['policy'] = None
         container_powerpolicy['damper'] = None
         container_powerpolicy['slowdown'] = None
+        container_powerpolicy['manager'] = None
         # TODO: Application library to load must be set during configuration
         applicationpreloadlibrary = ''
 

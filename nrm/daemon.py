@@ -3,6 +3,7 @@ from __future__ import print_function
 from applications import ApplicationManager
 from containers import ContainerManager
 from controller import Controller, ApplicationActuator, PowerActuator
+from powerpolicy import PowerPolicyManager
 from functools import partial
 import json
 import logging
@@ -80,6 +81,12 @@ class Daemon(object):
 
                 logger.info("new container required: %r", msg)
                 container = self.container_manager.create(msg)
+                if container.powerpolicy['policy']:
+                    container.powerpolicy['manager'] = PowerPolicyManager(
+                            container.resources['cpus'],
+                            container.powerpolicy['policy'],
+                            container.powerpolicy['damper'],
+                            container.powerpolicy['slowdown'])
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
