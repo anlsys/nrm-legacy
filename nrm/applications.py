@@ -84,7 +84,7 @@ class ApplicationManager(object):
         phase_contexts = dict()
         phase_context_keys = ['set', 'startcompute', 'endcompute',
                               'startbarrier', 'endbarrier']
-        if container.powerpolicy['policy']:
+        if container.power['policy']:
             ids = container.resources['cpus']
             for id in ids:
                 phase_contexts[id] = dict.fromkeys(phase_context_keys)
