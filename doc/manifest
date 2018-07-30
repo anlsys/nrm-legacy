@@ -25,9 +25,10 @@
 				}
 			},
 			{
-				"name": "argo/powerpolicy",
+				"name": "argo/power",
 				"value": {
-					"enabled": "0",
+					"enabled": "1",
+					"profile": "1",
 					"policy": "NONE",
 					"damper": "0.1",
 					"slowdown": "1.1"

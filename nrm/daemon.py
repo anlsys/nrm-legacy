@@ -53,7 +53,7 @@ class Daemon(object):
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
                     c = self.container_manager.containers[app.container_uuid]
-                    if c.powerpolicy['policy']:
+                    if c.power['policy']:
                         app.update_phase_context(msg)
             elif event == 'exit':
                 uuid = msg['uuid']
@@ -87,19 +87,19 @@ class Daemon(object):
 
                 logger.info("new container required: %r", msg)
                 container = self.container_manager.create(msg)
-                if container.powerpolicy['policy']:
-                    container.powerpolicy['manager'] = PowerPolicyManager(
+                if container.power['policy']:
+                    container.power['manager'] = PowerPolicyManager(
                             container.resources['cpus'],
-                            container.powerpolicy['policy'],
-                            float(container.powerpolicy['damper']),
-                            float(container.powerpolicy['slowdown']))
+                            container.power['policy'],
+                            float(container.power['damper']),
+                            float(container.power['slowdown']))
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
                           'uuid': container_uuid,
                           'errno': 0 if container else -1,
                           'pid': container.process.pid,
-                          'powerpolicy': container.powerpolicy['policy']
+                          'power': container.power['policy']
                           }
                 self.upstream_pub.send_json(update)
                 # setup io callbacks
@@ -179,8 +179,8 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
-                    if container.powerpolicy['policy']:
-                        container.powerpolicy['manager'].reset_all()
+                    if container.power['policy']:
+                        container.power['manager'].reset_all()
                     self.container_manager.delete(container.uuid)
                     msg = {'type': 'container',
                            'event': 'exit',
