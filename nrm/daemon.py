@@ -86,6 +86,7 @@ class Daemon(object):
                           'uuid': container_uuid,
                           'errno': 0 if container else -1,
                           'pid': container.process.pid,
+                          'powerpolicy': container.powerpolicy['policy']
                           }
                 self.upstream_pub.send_json(update)
                 # setup io callbacks

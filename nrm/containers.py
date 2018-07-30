@@ -7,7 +7,8 @@ import os
 from subprograms import ChrtClient, NodeOSClient, resources
 
 logger = logging.getLogger('nrm')
-Container = namedtuple('Container', ['uuid', 'manifest', 'process'])
+Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
+                                     'powerpolicy', 'process'])
 
 
 class ContainerManager(object):
@@ -56,7 +57,8 @@ class ContainerManager(object):
         environ['ARGO_CONTAINER_UUID'] = container_name
         logger.info("creating container %s", container_name)
         self.nodeos.create(container_name, allocation)
-        logger.info("created container %s", container_name)
+        container_resources = dict()
+        container_resources['cpus'], container_resources['mems'] = allocation
 
         # Container power policy information
         container_powerpolicy = dict()
@@ -95,9 +97,11 @@ class ContainerManager(object):
         argv.append(command)
         argv.extend(args)
         process = self.nodeos.execute(container_name, argv, environ)
-        c = Container(container_name, manifest, process)
+        c = Container(container_name, manifest, container_resources,
+                      container_powerpolicy, process)
         self.pids[process.pid] = c
         self.containers[container_name] = c
+        logger.info("Container %s created and running : %r", container_name, c)
         return c
 
     def delete(self, uuid):
