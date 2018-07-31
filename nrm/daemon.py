@@ -46,11 +46,11 @@ class Daemon(object):
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
                     app.update_progress(msg)
-            elif event == 'power_policy':
+            elif event == 'phase_context':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
-                    # TODO: Invoke appropriate power policy
+                    # TODO: Take appropriate action
             elif event == 'exit':
                 self.application_manager.delete(msg['uuid'])
             else:

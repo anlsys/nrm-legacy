@@ -3,7 +3,7 @@
  * Description: This file contains the implementation of downstream API to
  * transmit application context information to NRM.
  *
- * The application context information transmitted is used to monitor
+ * The application context information transmitted can be used to monitor
  * application progress and/or invoke power policies to improve energy
  * efficiency at the node level.
  */
@@ -71,9 +71,9 @@ int nrm_send_progress(struct nrm_context *ctxt, unsigned long progress)
     return 0;
 }
 
-int nrm_invoke_power_policy(struct nrm_context *ctxt, int cpu, double 
-        startCompute, double endCompute, double startBarrier, double 
-        endBarrier)
+int nrm_send_phase_context(struct nrm_context *ctxt, int cpu, unsigned long 
+        long int startCompute, unsigned long long int endCompute, unsigned 
+        long long int startBarrier, unsigned long long int endBarrier)
 {
     char buf[512];
     struct timespec now;
@@ -83,7 +83,7 @@ int nrm_invoke_power_policy(struct nrm_context *ctxt, int cpu, double
 
     if(timediff > NRM_RATELIMIT_THRESHOLD) 
     {
-        snprintf(buf, 512, NRM_POWER_POLICY_FORMAT, cpu, startCompute, 
+        snprintf(buf, 512, NRM_PHASE_CONTEXT_FORMAT, cpu, startCompute, 
                 endCompute, startBarrier, endBarrier, ctxt->app_uuid);
         int err = zmq_send(ctxt->socket, buf, strnlen(buf, 512), 0);
         assert(err > 0);
