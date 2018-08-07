@@ -117,3 +117,20 @@ class Controller(object):
     def update(self, action, actuator):
         """Update tracking across the board to reflect the last action."""
         actuator.update(action)
+
+    def run_policy(self, containers):
+        """Run policies on containers with policies set."""
+        for container in containers:
+            pp = containers[container].powerpolicy
+            if pp['policy']:
+                apps = self.actuators[0].application_manager.applications
+                if apps:
+                    app = next(apps[a] for a in apps if apps[a].container_uuid
+                               == container)
+                    ids = containers[container].resources['cpus']
+                    # Run policy only if all phase contexts have been received
+                    if not filter(lambda i: not app.phase_contexts[i]['set'],
+                                  ids):
+                        pp['manager'].run_policy(app.phase_contexts)
+                        if filter(lambda i: app.phase_contexts[i]['set'], ids):
+                            logger.debug("Phase context not reset %r", app)

@@ -35,7 +35,9 @@ class Daemon(object):
                 logger.error("wrong message format: %r", msg)
                 return
             if event == 'start':
-                self.application_manager.register(msg)
+                container_uuid = msg['container']
+                container = self.container_manager.containers[container_uuid]
+                self.application_manager.register(msg, container)
             elif event == 'threads':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
@@ -50,9 +52,13 @@ class Daemon(object):
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
-                    # TODO: Take appropriate action
+                    c = self.container_manager.containers[app.container_uuid]
+                    if c.powerpolicy['policy']:
+                        app.update_phase_context(msg)
             elif event == 'exit':
-                self.application_manager.delete(msg['uuid'])
+                uuid = msg['uuid']
+                if uuid in self.application_manager.applications:
+                    self.application_manager.delete(msg['uuid'])
             else:
                 logger.error("unknown event: %r", event)
                 return
@@ -85,8 +91,8 @@ class Daemon(object):
                     container.powerpolicy['manager'] = PowerPolicyManager(
                             container.resources['cpus'],
                             container.powerpolicy['policy'],
-                            container.powerpolicy['damper'],
-                            container.powerpolicy['slowdown'])
+                            float(container.powerpolicy['damper']),
+                            float(container.powerpolicy['slowdown']))
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
@@ -145,6 +151,9 @@ class Daemon(object):
         if action:
             self.controller.execute(action, actuator)
             self.controller.update(action, actuator)
+        # Call policy only if there are containers
+        if self.container_manager.containers:
+            self.controller.run_policy(self.container_manager.containers)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -170,6 +179,8 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
+                    if container.powerpolicy['policy']:
+                        container.powerpolicy['manager'].reset_all()
                     self.container_manager.delete(container.uuid)
                     msg = {'type': 'container',
                            'event': 'exit',
