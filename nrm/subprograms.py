@@ -114,11 +114,13 @@ class NodeOSClient(object):
         # to escape spaces from arguments before.
         argv = [s.replace(' ', r'\ ') for s in argv]
         cmd += " argv:'"+" ".join(argv)+"'"
+        env = ['{0}={1}'.format(envname, envval.replace(' ', r'\ '))
+               for envname, envval in environ.items()]
+        cmd += " env:'"+" ".join(env)+"'"
         args.append(cmd)
         return process.Subprocess(args, stdin=process.Subprocess.STREAM,
                                   stdout=process.Subprocess.STREAM,
-                                  stderr=process.Subprocess.STREAM,
-                                  env=environ)
+                                  stderr=process.Subprocess.STREAM)
 
 
 class ChrtClient(object):
