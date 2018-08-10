@@ -18,12 +18,13 @@ class Application(object):
                         'min_ask_i': {'done': 'stable', 'noop': 'noop'},
                         'noop': {}}
 
-    def __init__(self, uuid, container, progress, threads):
+    def __init__(self, uuid, container, progress, threads, phase_contexts):
         self.uuid = uuid
         self.container_uuid = container
         self.progress = progress
         self.threads = threads
         self.thread_state = 'stable'
+        self.phase_contexts = phase_contexts
 
     def do_thread_transition(self, event):
         """Update the thread fsm state."""
@@ -58,6 +59,13 @@ class Application(object):
         """Update the progress tracking."""
         assert self.progress
 
+    def update_phase_context(self, msg):
+        """Update the phase contextual information."""
+        id = int(msg['cpu'])
+        self.phase_contexts[id] = {k: int(msg[k]) for k in ('startcompute',
+                                   'endcompute', 'startbarrier', 'endbarrier')}
+        self.phase_contexts[id]['set'] = True
+
 
 class ApplicationManager(object):
 
@@ -66,15 +74,25 @@ class ApplicationManager(object):
     def __init__(self):
         self.applications = dict()
 
-    def register(self, msg):
+    def register(self, msg, container):
         """Register a new downstream application."""
 
         uuid = msg['uuid']
-        container = msg['container']
+        container_uuid = msg['container']
         progress = msg['progress']
         threads = msg['threads']
-        self.applications[uuid] = Application(uuid, container, progress,
-                                              threads)
+        phase_contexts = dict()
+        phase_context_keys = ['set', 'startcompute', 'endcompute',
+                              'startbarrier', 'endbarrier']
+        if container.powerpolicy['policy']:
+            ids = container.resources['cpus']
+            for id in ids:
+                phase_contexts[id] = dict.fromkeys(phase_context_keys)
+                phase_contexts[id]['set'] = False
+        else:
+            phase_contexts = None
+        self.applications[uuid] = Application(uuid, container_uuid, progress,
+                                              threads, phase_contexts)
 
     def delete(self, uuid):
         """Delete an application from the register."""

@@ -28,18 +28,20 @@
     for supported power contols and related information.
 """
 import ddcmpolicy
+import logging
+
+
+logger = logging.getLogger('nrm')
 
 
 class PowerPolicyManager:
     """ Used for power policy application """
 
-    def __init__(self, ncpus=0, policy='NONE', damper=0.1, slowdown=1.1):
+    def __init__(self, cpus=None, policy=None, damper=0.1, slowdown=1.1):
+        self.cpus = cpus
         self.policy = policy
         self.damper = damper
         self.slowdown = slowdown
-
-        # TODO: Need to set this based on container configuration
-        self.ncpus = ncpus
 
         # Intiliaze all power interfaces
         self.ddcmpolicy = ddcmpolicy.DDCMPolicy()
@@ -48,36 +50,35 @@ class PowerPolicyManager:
         self.maxdclevel = self.ddcmpolicy.maxdclevel
         # TODO: Need to set this value when DVFS policies are added
         self.maxfreqlevel = -1
-        # TODO: Need to only allow power changes to cpus in container
-        self.dclevel = dict.fromkeys(range(0, self.ncpus), self.maxdclevel)
-        self.freqlevel = dict.fromkeys(range(0, self.ncpus), self.maxfreqlevel)
+        self.dclevel = dict.fromkeys(self.cpus, self.maxdclevel)
+        self.freqlevel = dict.fromkeys(self.cpus, self.maxfreqlevel)
 
         # Book-keeping
         self.damperexits = 0
         self.slowdownexits = 0
-        self.prevtolalphasetime = 10000.0   # Random large value
+        self.prevtolalphasetime = 10000.0   # Any large value
 
-    def run_policy(self, cpu, startcompute, endcompute, startbarrier,
-                   endbarrier):
-        # Select and invoke appropriate power policy
-        # TODO: Need to add a better policy selection logic in addition to user
-        # specified
-        ret, value = self.invoke_policy(cpu, self.policy, self.dclevel[cpu],
-                                        self.freqlevel[cpu], startcompute,
-                                        endcompute, startbarrier, endbarrier)
-        if self.policy == 'DDCM' and ret in ['DDCM', 'SLOWDOWN']:
-            self.dclevel[cpu] = value
+    def run_policy(self, phase_contexts):
+        # Run only if policy is specified
+        if self.policy:
+            for id in phase_contexts:
+                if id not in self.cpus:
+                    logger.info("""Attempt to change power of cpu not in container
+                                : %r""", id)
+                    return
+                # Select and invoke appropriate power policy
+                # TODO: Need to add a better policy selection logic in addition
+                # to user specified using manifest file
+                ret, value = self.invoke_policy(id, **phase_contexts[id])
+                if self.policy == 'DDCM' and ret in ['DDCM', 'SLOWDOWN']:
+                    self.dclevel[id] = value
+                phase_contexts[id]['set'] = False
 
-    def invoke_policy(self, cpu, policy, dclevel, freqlevel, startcompute,
-                      endcompute, startbarrier, endbarrier):
-        # Run with no policy
-        if policy == "NONE":
-            return 'NONE', -1
-
+    def invoke_policy(self, cpu, **kwargs):
         # Calculate time spent in computation, barrier in current phase along
         # with total phase time
-        computetime = endcompute - startcompute
-        barriertime = endbarrier - startbarrier
+        computetime = kwargs['endcompute'] - kwargs['startcompute']
+        barriertime = kwargs['endbarrier'] - kwargs['startbarrier']
         totalphasetime = computetime + barriertime
 
         # If the current phase length is less than the damper value, then do
@@ -93,7 +94,7 @@ class PowerPolicyManager:
         # If the current phase has slowed down beyond the threshold set, then
         # reset power. This helps correct error in policy application or acts
         # as a rudimentary way to detect phase change
-        if(dclevel < self.ddcmpolicy.maxdclevel and totalphasetime >
+        if(self.dclevel[cpu] < self.ddcmpolicy.maxdclevel and totalphasetime >
                 self.slowdown * self.prevtolalphasetime):
             self.ddcmpolicy.dc.reset(cpu)
             newdclevel = self.ddcmpolicy.maxdclevel
@@ -101,9 +102,9 @@ class PowerPolicyManager:
             return 'SLOWDOWN', newdclevel
 
         # Invoke the correct policy based on operation module
-        if policy == "DDCM":
-            newdclevel = self.ddcmpolicy.execute(cpu, dclevel, computetime,
-                                                 totalphasetime)
+        if self.policy == "DDCM":
+            newdclevel = self.ddcmpolicy.execute(cpu, self.dclevel[cpu],
+                                                 computetime, totalphasetime)
 
         # TODO: Add DVFS and Combined policies
 
@@ -128,3 +129,8 @@ class PowerPolicyManager:
     def power_check(self, cpu):
         # Check status of all power controls
         return self.ddcmpolicy.dc.check(cpu)
+
+    def reset_all(self):
+        # Reset all cpus
+        for cpu in self.cpus:
+            self.power_reset(cpu)

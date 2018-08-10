@@ -28,7 +28,9 @@
 				"name": "argo/powerpolicy",
 				"value": {
 					"enabled": "0",
-					"policy": "NONE"
+					"policy": "NONE",
+					"damper": "0.1",
+					"slowdown": "1.1"
 				}
 			}
 		]

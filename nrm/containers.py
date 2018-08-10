@@ -7,7 +7,8 @@ import os
 from subprograms import ChrtClient, NodeOSClient, resources
 
 logger = logging.getLogger('nrm')
-Container = namedtuple('Container', ['uuid', 'manifest', 'process'])
+Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
+                                     'powerpolicy', 'process'])
 
 
 class ContainerManager(object):
@@ -50,15 +51,23 @@ class ContainerManager(object):
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
         logger.info("run: environ: %r", environ)
-        # TODO: Application library to load must be set during configuration
-        applicationpreloadlibrary = '.so'
 
         # create container
         container_name = request['uuid']
         environ['ARGO_CONTAINER_UUID'] = container_name
         logger.info("creating container %s", container_name)
         self.nodeos.create(container_name, allocation)
-        logger.info("created container %s", container_name)
+        container_resources = dict()
+        container_resources['cpus'], container_resources['mems'] = allocation
+
+        # Container power policy information
+        container_powerpolicy = dict()
+        container_powerpolicy['policy'] = None
+        container_powerpolicy['damper'] = None
+        container_powerpolicy['slowdown'] = None
+        container_powerpolicy['manager'] = None
+        # TODO: Application library to load must be set during configuration
+        applicationpreloadlibrary = ''
 
         # run my command
         if hasattr(manifest.app.isolators, 'scheduler'):
@@ -78,16 +87,22 @@ class ContainerManager(object):
 
         if hasattr(manifest.app.isolators, 'powerpolicy'):
             if hasattr(manifest.app.isolators.powerpolicy, 'enabled'):
-                if manifest.app.isolators.powerpolicy.enabled in ["1", "True"]:
-                    if manifest.app.isolators.powerpolicy.policy != "NONE":
-                        environ['LD_PRELOAD'] = applicationpreloadlibrary
+                    pp = manifest.app.isolators.powerpolicy
+                    if pp.enabled in ["1", "True"]:
+                        if pp.policy != "NONE":
+                            container_powerpolicy['policy'] = pp.policy
+                            container_powerpolicy['damper'] = pp.damper
+                            container_powerpolicy['slowdown'] = pp.slowdown
+                            environ['LD_PRELOAD'] = applicationpreloadlibrary
 
         argv.append(command)
         argv.extend(args)
         process = self.nodeos.execute(container_name, argv, environ)
-        c = Container(container_name, manifest, process)
+        c = Container(container_name, manifest, container_resources,
+                      container_powerpolicy, process)
         self.pids[process.pid] = c
         self.containers[container_name] = c
+        logger.info("Container %s created and running : %r", container_name, c)
         return c
 
     def delete(self, uuid):
