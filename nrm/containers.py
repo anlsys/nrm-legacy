@@ -91,8 +91,9 @@ class ContainerManager(object):
                     pp = manifest.app.isolators.power
                     if pp.enabled in ["1", "True"]:
                         if pp.profile in ["1", "True"]:
-                            # TODO: Take appropriate action
-                            pass
+                            container_power['profile'] = dict()
+                            container_power['profile']['start'] = dict()
+                            container_power['profile']['end'] = dict()
                         if pp.policy != "NONE":
                             container_power['policy'] = pp.policy
                             container_power['damper'] = pp.damper

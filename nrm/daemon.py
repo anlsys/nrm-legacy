@@ -93,6 +93,10 @@ class Daemon(object):
                             container.power['policy'],
                             float(container.power['damper']),
                             float(container.power['slowdown']))
+                if container.power['profile']:
+                            p = container.power['profile']
+                            p['start'] = self.machine_info['energy']['energy']
+                            p['start']['time'] = self.machine_info['time']
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
@@ -179,14 +183,29 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
-                    if container.power['policy']:
-                        container.power['manager'].reset_all()
-                    self.container_manager.delete(container.uuid)
+                    pp = container.power
+                    if pp['policy']:
+                        pp['manager'].reset_all()
                     msg = {'type': 'container',
                            'event': 'exit',
                            'status': status,
                            'uuid': container.uuid,
                            }
+                    if pp['profile']:
+                            e = pp['profile']['end']
+                            self.machine_info = self.sensor_manager.do_update()
+                            e = self.machine_info['energy']['energy']
+                            e['time'] = self.machine_info['time']
+                            s = pp['profile']['start']
+                            # Calculate difference between the values
+                            diff = self.sensor_manager.calc_difference(s, e)
+                            # Get final package temperature
+                            temp = self.machine_info['temperature']
+                            diff['temp'] = map(lambda k: temp[k]['pkg'], temp)
+                            logger.info("Container %r profile data: %r",
+                                        container.uuid, diff)
+                            msg['profile_data'] = diff
+                    self.container_manager.delete(container.uuid)
                     self.upstream_pub.send_json(msg)
             else:
                 logger.debug("child update ignored")
