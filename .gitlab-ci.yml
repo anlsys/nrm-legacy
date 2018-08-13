@@ -10,6 +10,8 @@ py.test:
   except:
     - /^wip\/.*/
     - /^WIP\/.*/
+  tags:
+    - rapl
 
 
 flake8:
