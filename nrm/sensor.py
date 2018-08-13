@@ -6,6 +6,7 @@
     This module should be the only one interfacing with coolr.
 """
 from __future__ import print_function
+import time
 import coolr
 import coolr.clr_rapl
 import coolr.clr_hwmon
@@ -33,6 +34,7 @@ class SensorManager:
         machine_info = dict()
         machine_info['energy'] = self.rapl.sample(accflag=True)
         machine_info['temperature'] = self.coretemp.sample()
+        machine_info['time'] = time.time()
         return machine_info
 
     def get_powerlimits(self):
@@ -42,3 +44,30 @@ class SensorManager:
 
     def set_powerlimit(self, domain, value):
         self.rapl.set_powerlimit(value, domain)
+
+    def calc_difference(self, start, end):
+        diff = dict()
+        # lengthen the shortened input dictionary keys
+        for k in start.keys():
+            if k not in ['time']:
+                start[k.replace('p', 'package-')] = start[k]
+                start.pop(k)
+                end[k.replace('p', 'package-')] = end[k]
+                end.pop(k)
+
+        # Calculate energy difference
+        diff['energy'] = self.rapl.diffenergy(start, end)
+        # Update time elapsed
+        diff['time'] = diff['energy']['time']
+        # Remove 'time' field returned by function
+        diff['energy'].pop('time')
+        # Convert uJ to J
+        diff['energy'] = {k: diff['energy'][k]/(1000000.0) for k in
+                          diff['energy']}
+
+        # Calculate power difference
+        diff['power'] = self.rapl.calcpower(start, end)
+        # Remove 'delta' field returned by function
+        diff['power'].pop('delta')
+
+        return diff
