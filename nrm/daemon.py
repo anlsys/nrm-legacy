@@ -53,7 +53,7 @@ class Daemon(object):
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
                     c = self.container_manager.containers[app.container_uuid]
-                    if c.powerpolicy['policy']:
+                    if c.power['policy']:
                         app.update_phase_context(msg)
             elif event == 'exit':
                 uuid = msg['uuid']
@@ -87,19 +87,23 @@ class Daemon(object):
 
                 logger.info("new container required: %r", msg)
                 container = self.container_manager.create(msg)
-                if container.powerpolicy['policy']:
-                    container.powerpolicy['manager'] = PowerPolicyManager(
+                if container.power['policy']:
+                    container.power['manager'] = PowerPolicyManager(
                             container.resources['cpus'],
-                            container.powerpolicy['policy'],
-                            float(container.powerpolicy['damper']),
-                            float(container.powerpolicy['slowdown']))
+                            container.power['policy'],
+                            float(container.power['damper']),
+                            float(container.power['slowdown']))
+                if container.power['profile']:
+                            p = container.power['profile']
+                            p['start'] = self.machine_info['energy']['energy']
+                            p['start']['time'] = self.machine_info['time']
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
                           'event': 'start',
                           'uuid': container_uuid,
                           'errno': 0 if container else -1,
                           'pid': container.process.pid,
-                          'powerpolicy': container.powerpolicy['policy']
+                          'power': container.power['policy']
                           }
                 self.upstream_pub.send_json(update)
                 # setup io callbacks
@@ -179,14 +183,29 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
-                    if container.powerpolicy['policy']:
-                        container.powerpolicy['manager'].reset_all()
-                    self.container_manager.delete(container.uuid)
+                    pp = container.power
+                    if pp['policy']:
+                        pp['manager'].reset_all()
                     msg = {'type': 'container',
                            'event': 'exit',
                            'status': status,
                            'uuid': container.uuid,
                            }
+                    if pp['profile']:
+                            e = pp['profile']['end']
+                            self.machine_info = self.sensor_manager.do_update()
+                            e = self.machine_info['energy']['energy']
+                            e['time'] = self.machine_info['time']
+                            s = pp['profile']['start']
+                            # Calculate difference between the values
+                            diff = self.sensor_manager.calc_difference(s, e)
+                            # Get final package temperature
+                            temp = self.machine_info['temperature']
+                            diff['temp'] = map(lambda k: temp[k]['pkg'], temp)
+                            logger.info("Container %r profile data: %r",
+                                        container.uuid, diff)
+                            msg['profile_data'] = diff
+                    self.container_manager.delete(container.uuid)
                     self.upstream_pub.send_json(msg)
             else:
                 logger.debug("child update ignored")

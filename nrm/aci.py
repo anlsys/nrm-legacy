@@ -143,47 +143,52 @@ class PerfWrapper(SpecField):
         if not ret:
             return ret
         if self.enabled not in ["0", "False", "1", "True"]:
-            logger.error("Invalid value of perfwrapper enabled: %s",
+            logger.error("Invalid value for perfwrapper enabled: %s",
                          self.enabled)
             return False
         return True
 
 
-class PowerPolicy(SpecField):
+class Power(SpecField):
 
-    """Information on whether to use power policy for a container."""
+    """Power settings for a container."""
 
     policies = ['NONE', 'DDCM', 'DVFS', 'COMBINED']
 
     fields = {"enabled": spec(unicode, False),
+              "profile": spec(unicode, False),
               "policy": spec(unicode, False),
               "damper": spec(unicode, False),
               "slowdown": spec(unicode, False)
               }
 
     def __init__(self):
-        """Create empty perf wrapper."""
+        """Create empty power settings object."""
         pass
 
     def load(self, data):
-        """Load perf wrapper information."""
-        ret = super(PowerPolicy, self).load(data)
+        """Load power settings."""
+        ret = super(Power, self).load(data)
         if not ret:
             return ret
         if self.enabled not in ["0", "False", "1", "True"]:
-            logger.error("Invalid value of powerpolicy enabled: %s",
+            logger.error("Invalid value for power enabled: %s",
+                         self.enabled)
+            return False
+        if self.profile not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value for power profile: %s",
                          self.enabled)
             return False
         if self.policy not in self.policies:
-            logger.error("Invalid value of powerpolicy policy: %s",
+            logger.error("Invalid value for power policy: %s",
                          self.policy)
             return False
         if self.damper < 0.0:
-            logger.error("Invalid value of powerpolicy damper: %s",
+            logger.error("Invalid value for power policy damper: %s",
                          self.policy)
             return False
         if self.slowdown < 1.0:
-            logger.error("Invalid value of powerpolicy slowdown: %s",
+            logger.error("Invalid value for power policy slowdown: %s",
                          self.policy)
             return False
         return True
@@ -196,7 +201,7 @@ class IsolatorList(SpecField):
     types = {"argo/scheduler": spec(Scheduler, False),
              "argo/container": spec(Container, True),
              "argo/perfwrapper": spec(PerfWrapper, False),
-             "argo/powerpolicy": spec(PowerPolicy, False)
+             "argo/power": spec(Power, False),
              }
 
     def __init__(self):

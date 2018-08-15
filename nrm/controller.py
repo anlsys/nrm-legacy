@@ -121,7 +121,7 @@ class Controller(object):
     def run_policy(self, containers):
         """Run policies on containers with policies set."""
         for container in containers:
-            pp = containers[container].powerpolicy
+            pp = containers[container].power
             if pp['policy']:
                 apps = self.actuators[0].application_manager.applications
                 if apps:

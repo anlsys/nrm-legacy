@@ -8,7 +8,7 @@ from subprograms import ChrtClient, NodeOSClient, resources
 
 logger = logging.getLogger('nrm')
 Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
-                                     'powerpolicy', 'process'])
+                                     'power', 'process'])
 
 
 class ContainerManager(object):
@@ -60,12 +60,13 @@ class ContainerManager(object):
         container_resources = dict()
         container_resources['cpus'], container_resources['mems'] = allocation
 
-        # Container power policy information
-        container_powerpolicy = dict()
-        container_powerpolicy['policy'] = None
-        container_powerpolicy['damper'] = None
-        container_powerpolicy['slowdown'] = None
-        container_powerpolicy['manager'] = None
+        # Container power settings
+        container_power = dict()
+        container_power['profile'] = None
+        container_power['policy'] = None
+        container_power['damper'] = None
+        container_power['slowdown'] = None
+        container_power['manager'] = None
         # TODO: Application library to load must be set during configuration
         applicationpreloadlibrary = ''
 
@@ -85,21 +86,25 @@ class ContainerManager(object):
                 if manifest.app.isolators.perfwrapper.enabled in ["1", "True"]:
                     argv.append('argo-perf-wrapper')
 
-        if hasattr(manifest.app.isolators, 'powerpolicy'):
-            if hasattr(manifest.app.isolators.powerpolicy, 'enabled'):
-                    pp = manifest.app.isolators.powerpolicy
+        if hasattr(manifest.app.isolators, 'power'):
+            if hasattr(manifest.app.isolators.power, 'enabled'):
+                    pp = manifest.app.isolators.power
                     if pp.enabled in ["1", "True"]:
+                        if pp.profile in ["1", "True"]:
+                            container_power['profile'] = dict()
+                            container_power['profile']['start'] = dict()
+                            container_power['profile']['end'] = dict()
                         if pp.policy != "NONE":
-                            container_powerpolicy['policy'] = pp.policy
-                            container_powerpolicy['damper'] = pp.damper
-                            container_powerpolicy['slowdown'] = pp.slowdown
+                            container_power['policy'] = pp.policy
+                            container_power['damper'] = pp.damper
+                            container_power['slowdown'] = pp.slowdown
                             environ['LD_PRELOAD'] = applicationpreloadlibrary
 
         argv.append(command)
         argv.extend(args)
         process = self.nodeos.execute(container_name, argv, environ)
         c = Container(container_name, manifest, container_resources,
-                      container_powerpolicy, process)
+                      container_power, process)
         self.pids[process.pid] = c
         self.containers[container_name] = c
         logger.info("Container %s created and running : %r", container_name, c)
