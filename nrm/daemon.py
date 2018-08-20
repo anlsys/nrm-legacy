@@ -55,6 +55,8 @@ class Daemon(object):
                     c = self.container_manager.containers[app.container_uuid]
                     if c.power['policy']:
                         app.update_phase_context(msg)
+                        # Run container policy
+                        self.controller.run_policy_container(c, app)
             elif event == 'exit':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
@@ -150,14 +152,15 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        plan = self.controller.planify(self.target, self.machine_info)
-        action, actuator = plan
-        if action:
-            self.controller.execute(action, actuator)
-            self.controller.update(action, actuator)
+        # plan = self.controller.planify(self.target, self.machine_info)
+        # action, actuator = plan
+        # if action:
+            # self.controller.execute(action, actuator)
+            # self.controller.update(action, actuator)
         # Call policy only if there are containers
-        if self.container_manager.containers:
-            self.controller.run_policy(self.container_manager.containers)
+        # if self.container_manager.containers:
+            # self.controller.run_policy(self.container_manager.containers)
+        pass
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -183,25 +186,29 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
-                    pp = container.power
-                    if pp['policy']:
-                        pp['manager'].reset_all()
+                    p = container.power
+                    if p['policy']:
+                        p['manager'].reset_all()
                     msg = {'type': 'container',
                            'event': 'exit',
                            'status': status,
                            'uuid': container.uuid,
                            }
-                    if pp['profile']:
-                            e = pp['profile']['end']
+                    if p['profile']:
+                            e = p['profile']['end']
                             self.machine_info = self.sensor_manager.do_update()
                             e = self.machine_info['energy']['energy']
                             e['time'] = self.machine_info['time']
-                            s = pp['profile']['start']
+                            s = p['profile']['start']
                             # Calculate difference between the values
                             diff = self.sensor_manager.calc_difference(s, e)
                             # Get final package temperature
                             temp = self.machine_info['temperature']
                             diff['temp'] = map(lambda k: temp[k]['pkg'], temp)
+                            diff['policy'] = p['policy']
+                            if p['policy']:
+                                diff['damper'] = float(p['damper'])/1000000000
+                                diff['slowdown'] = p['slowdown']
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff

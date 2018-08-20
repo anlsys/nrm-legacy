@@ -37,7 +37,8 @@ logger = logging.getLogger('nrm')
 class PowerPolicyManager:
     """ Used for power policy application """
 
-    def __init__(self, cpus=None, policy=None, damper=0.1, slowdown=1.1):
+    def __init__(self, cpus=None, policy=None, damper=1000000000,
+                 slowdown=1.1):
         self.cpus = cpus
         self.policy = policy
         self.damper = damper
@@ -56,7 +57,7 @@ class PowerPolicyManager:
         # Book-keeping
         self.damperexits = 0
         self.slowdownexits = 0
-        self.prevtolalphasetime = 10000.0   # Any large value
+        self.prevtolalphasetime = 1000000000000000   # Any large value
 
     def run_policy(self, phase_contexts):
         # Run only if policy is specified
@@ -69,17 +70,14 @@ class PowerPolicyManager:
                 # Select and invoke appropriate power policy
                 # TODO: Need to add a better policy selection logic in addition
                 # to user specified using manifest file
-                ret, value = self.invoke_policy(id, **phase_contexts[id])
+                ret, value = self.execute(id, **phase_contexts[id])
                 if self.policy == 'DDCM' and ret in ['DDCM', 'SLOWDOWN']:
                     self.dclevel[id] = value
                 phase_contexts[id]['set'] = False
 
-    def invoke_policy(self, cpu, **kwargs):
-        # Calculate time spent in computation, barrier in current phase along
-        # with total phase time
-        computetime = kwargs['endcompute'] - kwargs['startcompute']
-        barriertime = kwargs['endbarrier'] - kwargs['startbarrier']
-        totalphasetime = computetime + barriertime
+    def execute(self, cpu, **kwargs):
+        computetime = kwargs['computetime']
+        totalphasetime = kwargs['totaltime']
 
         # If the current phase length is less than the damper value, then do
         # not use policy. This avoids use of policy during startup operation

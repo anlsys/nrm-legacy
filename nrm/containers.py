@@ -68,7 +68,7 @@ class ContainerManager(object):
         container_power['slowdown'] = None
         container_power['manager'] = None
         # TODO: Application library to load must be set during configuration
-        applicationpreloadlibrary = ''
+        applicationpreloadlibrary = '/home/sriduttb/shared/argo/libnrm/libmpi_nrm.so'
 
         # run my command
         if hasattr(manifest.app.isolators, 'scheduler'):
@@ -99,6 +99,8 @@ class ContainerManager(object):
                             container_power['damper'] = pp.damper
                             container_power['slowdown'] = pp.slowdown
                             environ['LD_PRELOAD'] = applicationpreloadlibrary
+                            environ['NRM_TRANSMIT'] = "1"
+                            environ['NRM_DAMPER'] = pp.damper
 
         argv.append(command)
         argv.extend(args)
@@ -115,6 +117,12 @@ class ContainerManager(object):
         self.nodeos.delete(uuid, kill=True)
         self.resourcemanager.update(uuid)
         c = self.containers[uuid]
+        # TODO: Need to check if this is the correct approach even with
+        # multiple containers
+        if c.power['policy']:
+            del os.environ['LD_PRELOAD']
+            del os.environ['NRM_TRANSMIT']
+            del os.environ['NRM_DAMPER']
         del self.containers[uuid]
         del self.pids[c.process.pid]
 
