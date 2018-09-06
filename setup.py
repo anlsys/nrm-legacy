@@ -20,6 +20,6 @@ setup(
     ],
 
     packages=find_packages(),
-    install_requires=['six', 'pyzmq', 'tornado', 'numpy'],
+    install_requires=[],
     scripts=['bin/daemon', 'bin/app', 'bin/cmd', 'bin/argo-perf-wrapper']
 )
