@@ -13,14 +13,15 @@ from sensor import SensorManager
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
-
+import sys
 
 logger = logging.getLogger('nrm')
 
 
 class Daemon(object):
-    def __init__(self):
+    def __init__(self, statsFlag=False):
         self.target = 100.0
+        self.statsFlag = statsFlag
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -209,6 +210,9 @@ class Daemon(object):
                             if p['policy']:
                                 diff['damper'] = float(p['damper'])/1000000000
                                 diff['slowdown'] = p['slowdown']
+                                if self.statsFlag:
+                                    diff['policy_statistics'] = (
+                                        p['manager'].print_policy_stats(True))
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff
@@ -295,5 +299,8 @@ class Daemon(object):
 def runner():
     ioloop.install()
     logging.basicConfig(level=logging.DEBUG)
-    daemon = Daemon()
+    if len(sys.argv) > 1:
+        daemon = Daemon(True if sys.argv[1] == 'True' else False)
+    else:
+        daemon = Daemon()
     daemon.main()
