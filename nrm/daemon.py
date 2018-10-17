@@ -35,8 +35,8 @@ class Daemon(object):
                 logger.error("wrong message format: %r", msg)
                 return
             if event == 'start':
-                container_uuid = msg['container']
-                container = self.container_manager.containers[container_uuid]
+                cid = msg['container']
+                container = self.container_manager.containers[cid]
                 self.application_manager.register(msg, container)
             elif event == 'threads':
                 uuid = msg['uuid']
@@ -52,7 +52,7 @@ class Daemon(object):
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
-                    c = self.container_manager.containers[app.container_uuid]
+                    c = self.container_manager.containers[app.cid]
                     if c.power['policy']:
                         app.update_phase_context(msg)
             elif event == 'exit':
@@ -79,38 +79,44 @@ class Daemon(object):
                 self.target = float(msg['limit'])
                 logger.info("new target measure: %g", self.target)
             elif command == 'run':
-                container_uuid = msg['uuid']
-                if container_uuid in self.container_manager.containers:
-                    logger.info("container already created: %r",
-                                container_uuid)
-                    return
+                logger.info("new container will be created if it doesn't "
+                            "exist: %r", msg)
+                pid, container = self.container_manager.create(msg)
+                cid = container.uuid
+                clientid = container.clientids[pid]
 
-                logger.info("new container required: %r", msg)
-                container = self.container_manager.create(msg)
-                if container.power['policy']:
-                    container.power['manager'] = PowerPolicyManager(
-                            container.resources['cpus'],
-                            container.power['policy'],
-                            float(container.power['damper']),
-                            float(container.power['slowdown']))
-                if container.power['profile']:
-                            p = container.power['profile']
-                            p['start'] = self.machine_info['energy']['energy']
-                            p['start']['time'] = self.machine_info['time']
                 # TODO: obviously we need to send more info than that
                 update = {'type': 'container',
-                          'event': 'start',
-                          'uuid': container_uuid,
+                          'uuid': cid,
+                          'clientid': clientid,
                           'errno': 0 if container else -1,
-                          'pid': container.process.pid,
-                          'power': container.power['policy']
+                          'pid': pid,
                           }
-                self.upstream_pub.send_json(update)
+
+                if len(container.processes.keys()) == 1:
+                    update['event'] = 'start'
+                    if container.power['policy']:
+                        container.power['manager'] = PowerPolicyManager(
+                                container.resources['cpus'],
+                                container.power['policy'],
+                                float(container.power['damper']),
+                                float(container.power['slowdown']))
+                    if container.power['profile']:
+                        p = container.power['profile']
+                        p['start'] = self.machine_info['energy']['energy']
+                        p['start']['time'] = self.machine_info['time']
+                    update['power'] = container.power['policy']
+
+                else:
+                    update['event'] = 'process_start'
+
                 # setup io callbacks
-                outcb = partial(self.do_children_io, container_uuid, 'stdout')
-                errcb = partial(self.do_children_io, container_uuid, 'stderr')
-                container.process.stdout.read_until_close(outcb, outcb)
-                container.process.stderr.read_until_close(errcb, errcb)
+                outcb = partial(self.do_children_io, clientid, cid, 'stdout')
+                errcb = partial(self.do_children_io, clientid, cid, 'stderr')
+                container.processes[pid].stdout.read_until_close(outcb, outcb)
+                container.processes[pid].stderr.read_until_close(errcb, errcb)
+
+                self.upstream_pub.send_json(update)
             elif command == 'kill':
                 logger.info("asked to kill container: %r", msg)
                 response = self.container_manager.kill(msg['uuid'])
@@ -126,7 +132,7 @@ class Daemon(object):
             else:
                 logger.error("invalid command: %r", command)
 
-    def do_children_io(self, uuid, io, data):
+    def do_children_io(self, clientid, uuid, io, data):
         """Receive data from one of the children, and send it down the pipe.
 
         Meant to be partially defined on a children basis."""
@@ -134,6 +140,7 @@ class Daemon(object):
         update = {'type': 'container',
                   'event': io,
                   'uuid': uuid,
+                  'clientid': clientid,
                   'payload': data or 'eof',
                   }
         self.upstream_pub.send_json(update)
@@ -183,15 +190,21 @@ class Daemon(object):
                 # check if this is an exit
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
-                    pp = container.power
-                    if pp['policy']:
-                        pp['manager'].reset_all()
+                    clientid = container.clientids[pid]
+                    remaining_pids = [p for p in container.processes.keys()
+                                      if p != pid]
                     msg = {'type': 'container',
-                           'event': 'exit',
                            'status': status,
                            'uuid': container.uuid,
+                           'clientid': clientid,
                            }
-                    if pp['profile']:
+
+                    if not remaining_pids:
+                        msg['event'] = 'exit'
+                        pp = container.power
+                        if pp['policy']:
+                            pp['manager'].reset_all()
+                        if pp['profile']:
                             e = pp['profile']['end']
                             self.machine_info = self.sensor_manager.do_update()
                             e = self.machine_info['energy']['energy']
@@ -205,7 +218,15 @@ class Daemon(object):
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff
-                    self.container_manager.delete(container.uuid)
+                        self.container_manager.delete(container.uuid)
+                    else:
+                        msg['event'] = 'process_exit'
+                        # Remove the pid of process that is finished
+                        container.processes.pop(pid, None)
+                        self.container_manager.pids.pop(pid, None)
+                        logger.info("Process %s in Container %s has finised.",
+                                    pid, container.uuid)
+
                     self.upstream_pub.send_json(msg)
             else:
                 logger.debug("child update ignored")
