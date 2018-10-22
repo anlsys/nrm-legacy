@@ -13,7 +13,11 @@ from sensor import SensorManager
 import signal
 import zmq
 from zmq.eventloop import ioloop, zmqstream
+from nrm.messaging import MSGTYPES
+from nrm.messaging import UpstreamRPCServer, UpstreamPubServer
 
+RPC_MSG = MSGTYPES['up_rpc_rep']
+PUB_MSG = MSGTYPES['up_pub']
 
 logger = logging.getLogger('nrm')
 
@@ -63,97 +67,107 @@ class Daemon(object):
                 logger.error("unknown event: %r", event)
                 return
 
-    def do_upstream_receive(self, parts):
-        logger.info("receiving upstream message: %r", parts)
-        if len(parts) != 1:
-            logger.error("unexpected msg length, dropping it: %r", parts)
-            return
-        msg = json.loads(parts[0])
-        if isinstance(msg, dict):
-            command = msg.get('command')
-            # TODO: switch to a dispatch dictionary
-            if command is None:
-                logger.error("missing command in message: %r", msg)
-                return
-            if command == 'setpower':
-                self.target = float(msg['limit'])
-                logger.info("new target measure: %g", self.target)
-            elif command == 'run':
-                logger.info("new container will be created if it doesn't "
-                            "exist: %r", msg)
-                pid, container = self.container_manager.create(msg)
-                cid = container.uuid
-                clientid = container.clientids[pid]
-
-                # TODO: obviously we need to send more info than that
-                update = {'type': 'container',
-                          'uuid': cid,
-                          'clientid': clientid,
+    def do_upstream_receive(self, msg, client):
+        if msg.type == 'setpower':
+            self.target = float(msg.limit)
+            logger.info("new target measure: %g", self.target)
+            update = {'api': 'up_rpc_rep',
+                      'type': 'getpower',
+                      'limit': str(self.target)
+                      }
+            self.upstream_rpc_server.sendmsg(RPC_MSG['getpower'](**update),
+                                             client)
+        elif msg.type == 'run':
+            container_uuid = msg.container_uuid
+            params = {'manifest': msg.manifest,
+                      'file': msg.path,
+                      'args': msg.args,
+                      'uuid': msg.container_uuid,
+                      'environ': msg.environ,
+                      'clientid': client,
+                      }
+            pid, container = self.container_manager.create(params)
+            container_uuid = container.uuid
+            if len(container.processes.keys()) == 1:
+                if container.power['policy']:
+                    container.power['manager'] = PowerPolicyManager(
+                            container.resources['cpus'],
+                            container.power['policy'],
+                            float(container.power['damper']),
+                            float(container.power['slowdown']))
+                if container.power['profile']:
+                    p = container.power['profile']
+                    p['start'] = self.machine_info['energy']['energy']
+                    p['start']['time'] = self.machine_info['time']
+                update = {'api': 'up_rpc_rep',
+                          'type': 'start',
+                          'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
                           'pid': pid,
+                          'power': container.power['policy'] or dict()
                           }
-
-                if len(container.processes.keys()) == 1:
-                    update['event'] = 'start'
-                    if container.power['policy']:
-                        container.power['manager'] = PowerPolicyManager(
-                                container.resources['cpus'],
-                                container.power['policy'],
-                                float(container.power['damper']),
-                                float(container.power['slowdown']))
-                    if container.power['profile']:
-                        p = container.power['profile']
-                        p['start'] = self.machine_info['energy']['energy']
-                        p['start']['time'] = self.machine_info['time']
-                    update['power'] = container.power['policy']
-
-                else:
-                    update['event'] = 'process_start'
-
+                self.upstream_rpc_server.sendmsg(RPC_MSG['start'](**update),
+                                                 client)
                 # setup io callbacks
-                outcb = partial(self.do_children_io, clientid, cid, 'stdout')
-                errcb = partial(self.do_children_io, clientid, cid, 'stderr')
+                outcb = partial(self.do_children_io, client,
+                                container_uuid, 'stdout')
+                errcb = partial(self.do_children_io, client,
+                                container_uuid, 'stderr')
+                container.processes[pid].stdout.read_until_close(outcb, outcb)
+                container.processes[pid].stderr.read_until_close(errcb, errcb)
+            else:
+                update = {'api': 'up_rpc_rep',
+                          'type': 'process_start',
+                          'container_uuid': container_uuid,
+                          }
+                self.upstream_rpc_server.sendmsg(
+                        RPC_MSG['process_start'](**update), client)
+                # setup io callbacks
+                outcb = partial(self.do_children_io, client,
+                                container_uuid, 'stdout')
+                errcb = partial(self.do_children_io, client,
+                                container_uuid, 'stderr')
                 container.processes[pid].stdout.read_until_close(outcb, outcb)
                 container.processes[pid].stderr.read_until_close(errcb, errcb)
 
-                self.upstream_pub.send_json(update)
-            elif command == 'kill':
-                logger.info("asked to kill container: %r", msg)
-                response = self.container_manager.kill(msg['uuid'])
-                # no update here, as it will trigger child exit
-            elif command == 'list':
-                logger.info("asked for container list: %r", msg)
-                response = self.container_manager.list()
-                update = {'type': 'container',
-                          'event': 'list',
-                          'payload': response,
-                          }
-                self.upstream_pub.send_json(update)
-            else:
-                logger.error("invalid command: %r", command)
+        elif msg.type == 'kill':
+            logger.info("asked to kill container: %r", msg)
+            response = self.container_manager.kill(msg.container_uuid)
+            # no update here, as it will trigger child exit
+        elif msg.type == 'list':
+            logger.info("asked for container list: %r", msg)
+            response = self.container_manager.list()
+            update = {'api': 'up_rpc_rep',
+                      'type': 'list',
+                      'payload': response,
+                      }
+            self.upstream_rpc_server.sendmsg(RPC_MSG['list'](**update),
+                                             client)
+        else:
+            logger.error("invalid command: %r", msg.type)
 
-    def do_children_io(self, clientid, uuid, io, data):
+    def do_children_io(self, client, container_uuid, io, data):
         """Receive data from one of the children, and send it down the pipe.
 
         Meant to be partially defined on a children basis."""
-        logger.info("%r received %r data: %r", uuid, io, data)
-        update = {'type': 'container',
-                  'event': io,
-                  'uuid': uuid,
-                  'clientid': clientid,
+        logger.info("%r received %r data: %r", container_uuid, io, data)
+        update = {'api': 'up_rpc_rep',
+                  'type': io,
+                  'container_uuid': container_uuid,
                   'payload': data or 'eof',
                   }
-        self.upstream_pub.send_json(update)
+        self.upstream_rpc_server.sendmsg(RPC_MSG[io](**update), client)
 
     def do_sensor(self):
         self.machine_info = self.sensor_manager.do_update()
         logger.info("current state: %r", self.machine_info)
         total_power = self.machine_info['energy']['power']['total']
-        msg = {'type': 'power',
+        msg = {'api': 'up_pub',
+               'type': 'power',
                'total': total_power,
                'limit': self.target
                }
-        self.upstream_pub.send_json(msg)
+        self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
@@ -193,14 +207,13 @@ class Daemon(object):
                     clientid = container.clientids[pid]
                     remaining_pids = [p for p in container.processes.keys()
                                       if p != pid]
-                    msg = {'type': 'container',
-                           'status': status,
-                           'uuid': container.uuid,
-                           'clientid': clientid,
+                    msg = {'api': 'up_rpc_rep',
+                           'status': str(status),
+                           'container_uuid': container.uuid,
                            }
 
                     if not remaining_pids:
-                        msg['event'] = 'exit'
+                        msg['type'] = 'exit'
                         pp = container.power
                         if pp['policy']:
                             pp['manager'].reset_all()
@@ -219,15 +232,18 @@ class Daemon(object):
                                         container.uuid, diff)
                             msg['profile_data'] = diff
                         self.container_manager.delete(container.uuid)
+                        self.upstream_rpc_server.sendmsg(
+                                RPC_MSG['exit'](**msg), clientid)
                     else:
-                        msg['event'] = 'process_exit'
+                        msg['type'] = 'process_exit'
                         # Remove the pid of process that is finished
                         container.processes.pop(pid, None)
                         self.container_manager.pids.pop(pid, None)
                         logger.info("Process %s in Container %s has finised.",
                                     pid, container.uuid)
+                        self.upstream_rpc_server.sendmsg(
+                                RPC_MSG['process_exit'](**msg), clientid)
 
-                    self.upstream_pub.send_json(msg)
             else:
                 logger.debug("child update ignored")
                 pass
@@ -240,44 +256,37 @@ class Daemon(object):
         # Bind address for downstream clients
         bind_address = '*'
 
-        # PUB port for upstream clients
+        # port for upstream PUB API
         upstream_pub_port = 2345
-        # SUB port for upstream clients
-        upstream_sub_port = 3456
+        # port for upstream RPC API
+        upstream_rpc_port = 3456
 
         # setup application listening socket
         context = zmq.Context()
         downstream_pub_socket = context.socket(zmq.PUB)
         downstream_sub_socket = context.socket(zmq.SUB)
-        upstream_pub_socket = context.socket(zmq.PUB)
-        upstream_sub_socket = context.socket(zmq.SUB)
-
         downstream_pub_param = "ipc:///tmp/nrm-downstream-out"
         downstream_sub_param = "ipc:///tmp/nrm-downstream-in"
         upstream_pub_param = "tcp://%s:%d" % (bind_address, upstream_pub_port)
-        upstream_sub_param = "tcp://%s:%d" % (bind_address, upstream_sub_port)
+        upstream_rpc_param = "tcp://%s:%d" % (bind_address, upstream_rpc_port)
 
         downstream_pub_socket.bind(downstream_pub_param)
         downstream_sub_socket.bind(downstream_sub_param)
         downstream_sub_filter = ""
         downstream_sub_socket.setsockopt(zmq.SUBSCRIBE, downstream_sub_filter)
-        upstream_pub_socket.bind(upstream_pub_param)
-        upstream_sub_socket.bind(upstream_sub_param)
-        upstream_sub_filter = ""
-        upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
+        self.upstream_pub_server = UpstreamPubServer(upstream_pub_param)
+        self.upstream_rpc_server = UpstreamRPCServer(upstream_rpc_param)
 
         logger.info("downstream pub socket bound to: %s", downstream_pub_param)
         logger.info("downstream sub socket bound to: %s", downstream_sub_param)
         logger.info("upstream pub socket bound to: %s", upstream_pub_param)
-        logger.info("upstream sub socket connected to: %s", upstream_sub_param)
+        logger.info("upstream rpc socket connected to: %s", upstream_rpc_param)
 
         # register socket triggers
         self.downstream_sub = zmqstream.ZMQStream(downstream_sub_socket)
         self.downstream_sub.on_recv(self.do_downstream_receive)
-        self.upstream_sub = zmqstream.ZMQStream(upstream_sub_socket)
-        self.upstream_sub.on_recv(self.do_upstream_receive)
+        self.upstream_rpc_server.setup_recv_callback(self.do_upstream_receive)
         # create a stream to let ioloop deal with blocking calls on HWM
-        self.upstream_pub = zmqstream.ZMQStream(upstream_pub_socket)
         self.downstream_pub = zmqstream.ZMQStream(downstream_pub_socket)
 
         # create managers
