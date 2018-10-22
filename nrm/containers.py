@@ -37,7 +37,7 @@ class ContainerManager(object):
         command = request['file']
         args = request['args']
         environ = request['environ']
-        ucontainername = request['ucontainername']
+        ucontainername = request['uuid']
         logger.info("run: manifest file:  %s", manifestfile)
         logger.info("run: command:        %s", command)
         logger.info("run: args:           %r", args)

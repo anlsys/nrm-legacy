@@ -3,12 +3,12 @@
 from __future__ import print_function
 import argparse
 import logging
-import uuid
 import signal
-import zmq
 import os
+import nrm.messaging
 
-logger = logging.getLogger('nrm-cmd')
+RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
+logger = logging.getLogger('nrm')
 
 
 class CommandLineInterface(object):
@@ -23,95 +23,79 @@ class CommandLineInterface(object):
         exit(1)
 
     def setup(self):
-        # SUB port to the upstream API (connected to its PUB port)
-        upstream_sub_port = 2345
-        # PUB port to the upstream API (connected to its SUB port)
-        upstream_pub_port = 3456
-
-        self.context = zmq.Context()
-        self.upstream_pub_socket = self.context.socket(zmq.PUB)
-        self.upstream_sub_socket = self.context.socket(zmq.SUB)
-
-        upstream_pub_param = "tcp://localhost:%d" % (upstream_pub_port)
-        upstream_sub_param = "tcp://localhost:%d" % (upstream_sub_port)
-
-        self.upstream_pub_socket.connect(upstream_pub_param)
-        self.upstream_sub_socket.connect(upstream_sub_param)
-        # we want to receive everything for now
-        upstream_sub_filter = ""
-        self.upstream_sub_socket.setsockopt(zmq.SUBSCRIBE, upstream_sub_filter)
-
-        logger.info("upstream pub socket bound to: %s", upstream_pub_param)
-        logger.info("upstream sub socket connected to: %s", upstream_sub_param)
+        # upstream RPC port
+        upstream_client_port = 3456
+        upstream_client_param = "tcp://localhost:%d" % (upstream_client_port)
+        self.client = nrm.messaging.UpstreamRPCClient(upstream_client_param)
 
         # take care of signals
         signal.signal(signal.SIGINT, self.do_signal)
 
-        # create a uuid for this client instance
-        self.uuid = str(uuid.uuid4())
-        logger.info("client uuid: %r", self.uuid)
+        self.client.wait_connected()
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
         in it.
 
-        The NRM should notify us on the pub socket of the container
-        creation."""
+        The NRM should reply for container info."""
 
         # build the command as a JSON dict containing enough info. We add to
         # the command a container uuid as a way to make sure that we can make
         # the command idempotent.
         environ = os.environ
-        command = {'clientid': self.uuid,
-                   'ucontainername': argv.ucontainername,
-                   'command': 'run',
+        command = {'api': 'up_rpc_req',
+                   'type': 'run',
                    'manifest': argv.manifest,
-                   'file': argv.command,
+                   'path': argv.command,
                    'args': argv.args,
                    'environ': dict(environ),
+                   'container_uuid': str(argv.ucontainername),
                    }
+        msg = RPC_MSG['run'](**command)
         # command fsm
         state = 'init'
         outeof = False
         erreof = False
         exitmsg = None
-        self.upstream_pub_socket.send_json(command)
+        self.client.sendmsg(msg)
         while(True):
-            msg = self.upstream_sub_socket.recv_json()
-            if isinstance(msg, dict) and msg.get('type') == 'container':
-                if msg['clientid'] == self.uuid:
-                    if msg['event'] == 'start':
-                        if state == 'init':
-                            state = 'started'
-                            logger.info("container started: %r", msg)
-                        else:
-                            logger.info("unexpected start message: %r", state)
-                            exit(1)
-                    elif msg['event'] == 'stdout':
-                        logger.info("container msg: %r", msg)
-                        if msg['payload'] == 'eof':
-                            outeof = True
-                    elif msg['event'] == 'stderr':
-                        logger.info("container msg: %r", msg)
-                        if msg['payload'] == 'eof':
-                            erreof = True
-                    elif msg['event'] == 'exit':
-                        if state == 'started':
-                            state = 'exiting'
-                            exitmsg = msg
-                        else:
-                            logger.info("unexpected exit message: %r", msg)
-                    elif msg['event'] == 'process_start':
-                        if state == 'init':
-                            state = 'started'
-                            logger.info("process started in existing "
-                                        "container: %r""", msg)
-                        else:
-                            logger.info("unexpected start message: %r", state)
-                            exit(1)
-                    elif msg['event'] == 'process_exit':
-                            logger.info("process ended: %r", msg)
-                            break
+            msg = self.client.recvmsg()
+            assert msg.api == 'up_rpc_rep'
+            assert msg.type in ['start', 'stdout', 'stderr', 'exit',
+                                'process_start', 'process_exit']
+
+            if msg.type == 'start':
+                if state == 'init':
+                    state = 'started'
+                    logger.info("container started: %r", msg)
+                else:
+                    logger.info("unexpected start message: %r", state)
+                    exit(1)
+            elif msg.type == 'process_start':
+                if state == 'init':
+                    state = 'started'
+                    logger.info("process started in existing "
+                                "container: %r""", msg)
+                else:
+                    logger.info("unexpected start message: %r", state)
+                    exit(1)
+            elif msg.type == 'stdout':
+                logger.info("container msg: %r", msg)
+                if msg.payload == 'eof':
+                    outeof = True
+            elif msg.type == 'stderr':
+                logger.info("container msg: %r", msg)
+                if msg.payload == 'eof':
+                    erreof = True
+            elif msg.type == 'process_exit':
+                logger.info("process ended: %r", msg)
+                break
+            elif msg.type == 'exit':
+                if state == 'started':
+                    state = 'exiting'
+                    exitmsg = msg
+                else:
+                    logger.info("unexpected exit message: %r", msg)
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
                 logger.info("container ended: %r", exitmsg)
@@ -121,65 +105,55 @@ class CommandLineInterface(object):
         """Connect to the NRM and ask to list the containers present on the
         system.
 
-        The NRM should respond to us on the pub socket with one message listing
-        all containers."""
+        The NRM should respond to us with one message listing all
+        containers."""
 
-        command = {'command': 'list',
-                   }
-
-        self.upstream_pub_socket.send_json(command)
-        while(True):
-            msg = self.upstream_sub_socket.recv_json()
-            logger.info("new message: %r", msg)
-            # ignore other messages
-            if isinstance(msg, dict) and msg.get('type') == 'container':
-                if msg['event'] == 'list':
-                    logger.info("list response: %r", msg)
-                    break
+        command = {'api': 'up_rpc_req',
+                   'type': 'list'}
+        msg = RPC_MSG['list'](**command)
+        self.client.sendmsg(msg)
+        msg = self.client.recvmsg()
+        assert msg.api == 'up_rpc_rep'
+        assert msg.type == 'list'
+        logger.info("list response: %r", msg)
 
     def do_kill(self, argv):
         """Connect to the NRM and ask to kill a container by uuid.
 
-        The NRM should respond to us on the pub socket with a message
-        containing the exit status of the top process of the container."""
+        The NRM should respond to us with a message containing the exit status
+        of the top process of the container."""
 
-        command = {'command': 'kill',
-                   'uuid': argv.uuid
+        command = {'api': 'up_rpc_req',
+                   'type': 'kill',
+                   'container_uuid': argv.uuid
                    }
-
-        self.upstream_pub_socket.send_json(command)
-        while(True):
-            msg = self.upstream_sub_socket.recv_json()
-            logger.info("new message: %r", msg)
-            # ignore other messages
-            if isinstance(msg, dict) and msg.get('type') == 'container':
-                if msg['event'] == 'exit' and msg['uuid'] == argv.uuid:
-                    logger.info("container exit: %r", msg)
-                    break
+        msg = RPC_MSG['kill'](**command)
+        self.client.sendmsg(msg)
+        msg = self.client.recvmsg()
+        assert msg.api == 'up_rpc_rep'
+        assert msg.type == 'exit'
+        logger.info("container exit: %r", msg)
 
     def do_setpower(self, argv):
         """ Connect to the NRM and ask to change the power limit.
 
-        The NRM should answer on the pub socket with an acknowledgment."""
+        The NRM should answer with an acknowledgment."""
 
         # build the command as a JSON dict giving enough info. This is an
         # idempotent command, so we will repeat the command if we don't get a
         # timely answer.
         # TODO: check that the level makes a little bit of sense in the first
         # place
-        command = {'command': 'setpower',
-                   'limit': argv.limit,
+        command = {'api': 'up_rpc_req',
+                   'type': 'setpower',
+                   'limit': str(argv.limit),
                    }
-
-        self.upstream_pub_socket.send_json(command)
-        while(True):
-            msg = self.upstream_sub_socket.recv_json()
-            logger.info("new message: %r", msg)
-            # ignore other messages
-            if isinstance(msg, dict) and msg.get('type') == 'power':
-                if msg['limit'] == argv.limit:
-                    logger.info("command received by the daemon")
-                    break
+        msg = RPC_MSG['setpower'](**command)
+        self.client.sendmsg(msg)
+        msg = self.client.recvmsg()
+        assert msg.api == 'up_rpc_rep'
+        assert msg.type == 'getpower'
+        logger.info("command received by the daemon: %r", msg)
 
     def main(self):
         parser = argparse.ArgumentParser()
