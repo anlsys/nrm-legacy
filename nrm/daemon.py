@@ -214,6 +214,7 @@ class Daemon(object):
 
                     if not remaining_pids:
                         msg['type'] = 'exit'
+                        msg['profile_data'] = dict()
                         pp = container.power
                         if pp['policy']:
                             pp['manager'].reset_all()
