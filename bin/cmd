@@ -6,6 +6,7 @@ import logging
 import signal
 import os
 import nrm.messaging
+import uuid
 
 RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
 logger = logging.getLogger('nrm')
@@ -49,7 +50,7 @@ class CommandLineInterface(object):
                    'path': argv.command,
                    'args': argv.args,
                    'environ': dict(environ),
-                   'container_uuid': str(argv.ucontainername),
+                   'container_uuid': argv.ucontainername or str(uuid.uuid4()),
                    }
         msg = RPC_MSG['run'](**command)
         # command fsm
