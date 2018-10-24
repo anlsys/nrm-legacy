@@ -25,6 +25,7 @@ logger = logging.getLogger('nrm')
 class Daemon(object):
     def __init__(self):
         self.target = 100.0
+        self.container_owner = dict()
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -107,6 +108,7 @@ class Daemon(object):
                           }
                 self.upstream_rpc_server.sendmsg(RPC_MSG['start'](**update),
                                                  client)
+                self.container_owner[container.uuid] = client
 
             # now deal with the process itself
             update = {'api': 'up_rpc_rep',
@@ -213,7 +215,9 @@ class Daemon(object):
                     logger.info("Process %s in Container %s has finised.",
                                 pid, container.uuid)
 
-                    if not container.processes:
+                    # if this process was owner of the container,
+                    # kill everything
+                    if self.container_owner[container.uuid] == clientid:
                         # deal with container exit
                         msg = {'api': 'up_rpc_rep',
                                'type': 'exit',
@@ -240,6 +244,7 @@ class Daemon(object):
                         self.container_manager.delete(container.uuid)
                         self.upstream_rpc_server.sendmsg(
                                 RPC_MSG['exit'](**msg), clientid)
+                        del self.container_owner[container.uuid]
             else:
                 logger.debug("child update ignored")
                 pass
