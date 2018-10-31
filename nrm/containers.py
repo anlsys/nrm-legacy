@@ -4,7 +4,6 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 from subprograms import ChrtClient, NodeOSClient, resources
-import uuid
 
 logger = logging.getLogger('nrm')
 Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
@@ -35,20 +34,20 @@ class ContainerManager(object):
 
         Returns the pid of the container or a negative number for errors."""
         container = None
-        container_name = None
         containerexistsflag = False
         processes = None
         clientids = None
+        pp = None
 
         manifestfile = request['manifest']
         command = request['file']
         args = request['args']
         environ = request['environ']
-        ucontainername = request['uuid']
+        container_name = request['uuid']
         logger.info("run: manifest file:  %s", manifestfile)
         logger.info("run: command:        %s", command)
         logger.info("run: args:           %r", args)
-        logger.info("run: ucontainername: %s", ucontainername)
+        logger.info("run: container name: %s", container_name)
 
         # TODO: Application library to load must be set during configuration
         apppreloadlibrary = self.pmpi_lib
@@ -64,22 +63,15 @@ class ContainerManager(object):
         else:
             argv = []
 
-        # Check if user-specified container exists else create it
-        if ucontainername in self.containers:
-                container_name = ucontainername
-                container = self.containers[ucontainername]
+        # Check if container exists else create it
+        if container_name in self.containers:
+                container = self.containers[container_name]
                 containerexistsflag = True
                 processes = container.processes
                 clientids = container.clientids
         else:
             processes = dict()
             clientids = dict()
-
-            if ucontainername:
-                container_name = ucontainername
-            else:
-                # If no user-specified container name create one
-                container_name = str(uuid.uuid4())
 
             # ask the resource manager for resources
             req = resources(int(manifest.app.isolators.container.cpus.value),
@@ -123,7 +115,6 @@ class ContainerManager(object):
                                 container_power['policy'] = pp.policy
                                 container_power['damper'] = pp.damper
                                 container_power['slowdown'] = pp.slowdown
-                                environ['LD_PRELOAD'] = apppreloadlibrary
 
         # build context to execute
         # environ['PATH'] = ("/usr/local/sbin:"
@@ -132,6 +123,14 @@ class ContainerManager(object):
         environ['PERF'] = self.linuxperf
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
+        if (containerexistsflag and container.power['policy'] is not None) or (
+                pp is not None and pp.policy != "NONE"):
+            environ['LD_PRELOAD'] = apppreloadlibrary
+            environ['NRM_TRANSMIT'] = '1'
+            if containerexistsflag:
+                environ['NRM_DAMPER'] = container.power['damper']
+            else:
+                environ['NRM_DAMPER'] = pp.damper
 
         argv.append(command)
         argv.extend(args)

@@ -7,6 +7,7 @@ from powerpolicy import PowerPolicyManager
 from functools import partial
 import logging
 import os
+import socket
 from resources import ResourceManager
 from sensor import SensorManager
 import signal
@@ -248,6 +249,7 @@ class Daemon(object):
                             if p['policy']:
                                 diff['damper'] = float(p['damper'])/1000000000
                                 diff['slowdown'] = p['slowdown']
+                            diff['nodename'] = socket.gethostname()
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff
