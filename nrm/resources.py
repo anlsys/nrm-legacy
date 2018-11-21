@@ -11,8 +11,8 @@ class ResourceManager(object):
     """Manages the query of node resources, the tracking of their use and
     the scheduling of new containers according to partitioning rules."""
 
-    def __init__(self):
-        self.hwloc = HwlocClient()
+    def __init__(self, hwloc):
+        self.hwloc = HwlocClient(hwloc=hwloc)
 
         # query the node topo, keep track of the critical resources
         self.allresources = self.hwloc.info()
