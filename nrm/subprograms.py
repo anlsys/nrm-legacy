@@ -40,9 +40,9 @@ class NodeOSClient(object):
 
     """Client to argo_nodeos_config."""
 
-    def __init__(self):
+    def __init__(self, argo_nodeos_config="argo_nodeos_config"):
         """Load client configuration."""
-        self.prefix = "argo_nodeos_config"
+        self.prefix = argo_nodeos_config
 
     def getavailable(self):
         """Gather available resources."""
@@ -151,9 +151,9 @@ class HwlocClient(object):
 
     """Client to hwloc binaries."""
 
-    def __init__(self):
+    def __init__(self, hwloc="hwloc"):
         """Load configuration."""
-        self.prefix = "hwloc"
+        self.prefix = hwloc
 
     def info(self):
         """Return list of all cpus and mems."""

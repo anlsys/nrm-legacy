@@ -16,11 +16,16 @@ class ContainerManager(object):
     """Manages the creation, listing and deletion of containers, using a
     container runtime underneath."""
 
-    def __init__(self, rm):
+    def __init__(self, rm,
+                 perfwrapper="argo-perf-wrapper",
+                 linuxperf="perf",
+                 argo_nodeos_config="argo_nodeos_config"):
+        self.linuxperf = linuxperf
+        self.perfwrapper = perfwrapper
+        self.nodeos = NodeOSClient(argo_nodeos_config=argo_nodeos_config)
         self.containers = dict()
         self.pids = dict()
         self.resourcemanager = rm
-        self.nodeos = NodeOSClient()
         self.chrt = ChrtClient()
 
     def create(self, request):
@@ -102,7 +107,7 @@ class ContainerManager(object):
                 manifest_perfwrapper = manifest.app.isolators.perfwrapper
                 if hasattr(manifest_perfwrapper, 'enabled'):
                     if manifest_perfwrapper.enabled in ["1", "True"]:
-                        argv.append('argo-perf-wrapper')
+                        argv.append(self.perfwrapper)
 
             if hasattr(manifest.app.isolators, 'power'):
                 if hasattr(manifest.app.isolators.power, 'enabled'):
@@ -122,6 +127,7 @@ class ContainerManager(object):
         # environ['PATH'] = ("/usr/local/sbin:"
         #                   "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         environ['ARGO_CONTAINER_UUID'] = container_name
+        environ['PERF'] = self.linuxperf
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
 
