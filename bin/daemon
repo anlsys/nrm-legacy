@@ -1,7 +1,46 @@
 #!/usr/bin/env python2
 
+import argparse
+import json
+import sys
 import nrm
 import nrm.daemon
 
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
+
+  conf_parser = argparse.ArgumentParser(
+    description=__doc__,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    add_help=False
+    )
+  conf_parser.add_argument("-c", "--configuration",
+                    help="Specify a config json-formatted config file that use any \
+                            CLI option. Any actually provided command-line options \
+                            will silently override a corresponding value from the \
+                            configuration file, if it exists.", metavar="FILE")
+  conf_parser.add_argument("-d","--print_defaults", action='store_true'
+          , help="Print the default configuration file.")
+  args, remaining_argv = conf_parser.parse_known_args()
+
+  defaults = { "log":"/tmp/argo_daemon.log"
+             , "log_power":"/tmp/argo_daemon_power.log" }
+
+  if args.print_defaults:
+    print defaults
+    return(0)
+
+  if args.configuration:
+    defaults.update(json.load(open(args.configuration)))
+
+  parser = argparse.ArgumentParser( parents=[conf_parser])
+  parser.set_defaults(**defaults)
+  parser.add_argument("--log", help="Main log file.",metavar="FILE")
+  parser.add_argument("--log_power", help="Power data log file (High throughput).",metavar="FILE")
+  args = parser.parse_args(remaining_argv)
+  nrm.daemon.runner(config=args)
+  return(0)
+
 if __name__ == "__main__":
-    nrm.daemon.runner()
+  sys.exit(main())

@@ -20,11 +20,12 @@ RPC_MSG = MSGTYPES['up_rpc_rep']
 PUB_MSG = MSGTYPES['up_pub']
 
 logger = logging.getLogger('nrm')
-
+logger_power = logging.getLogger('power')
 
 class Daemon(object):
-    def __init__(self):
+    def __init__(self, config):
         self.target = 100.0
+        self.config = config
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -316,8 +317,22 @@ class Daemon(object):
         ioloop.IOLoop.current().start()
 
 
-def runner():
+def runner(config):
     ioloop.install()
-    logging.basicConfig(level=logging.DEBUG)
-    daemon = Daemon()
+
+    logger.setLevel(logging.DEBUG)
+    logger_power.setLevel(logging.DEBUG)
+
+    if config.log:
+        print("Logging to %s" %config.log)
+        logger.addHandler(logging.FileHandler(config.log))
+
+    if config.log_power:
+        print("Logging power data to %s" %config.log_power)
+        formatter=logging.Formatter('%(message)s')
+        handler=logging.FileHandler(config.log_power)
+        handler.setFormatter(formatter)
+        logger_power.addHandler(handler)
+
+    daemon = Daemon(config)
     daemon.main()
