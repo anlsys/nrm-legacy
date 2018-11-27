@@ -23,6 +23,7 @@ logger = logging.getLogger('nrm')
 logger_power = logging.getLogger('power')
 
 class Daemon(object):
+
     def __init__(self, config):
         self.target = 100.0
         self.config = config
@@ -324,13 +325,13 @@ def runner(config):
     logger_power.setLevel(logging.DEBUG)
 
     if config.log:
-        print("Logging to %s" %config.log)
+        print("Logging to %s" % config.log)
         logger.addHandler(logging.FileHandler(config.log))
 
     if config.log_power:
-        print("Logging power data to %s" %config.log_power)
-        formatter=logging.Formatter('%(message)s')
-        handler=logging.FileHandler(config.log_power)
+        print("Logging power data to %s" % config.log_power)
+        formatter = logging.Formatter('%(message)s')
+        handler = logging.FileHandler(config.log_power)
         handler.setFormatter(formatter)
         logger_power.addHandler(handler)
 
