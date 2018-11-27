@@ -27,6 +27,7 @@ class Daemon(object):
     def __init__(self, config):
         self.target = 100.0
         self.config = config
+        self.container_owner = dict()
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -105,33 +106,27 @@ class Daemon(object):
                           'type': 'start',
                           'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
-                          'pid': pid,
                           'power': container.power['policy'] or dict()
                           }
                 self.upstream_rpc_server.sendmsg(RPC_MSG['start'](**update),
                                                  client)
-                # setup io callbacks
-                outcb = partial(self.do_children_io, client,
-                                container_uuid, 'stdout')
-                errcb = partial(self.do_children_io, client,
-                                container_uuid, 'stderr')
-                container.processes[pid].stdout.read_until_close(outcb, outcb)
-                container.processes[pid].stderr.read_until_close(errcb, errcb)
-            else:
-                update = {'api': 'up_rpc_rep',
-                          'type': 'process_start',
-                          'container_uuid': container_uuid,
-                          }
-                self.upstream_rpc_server.sendmsg(
-                        RPC_MSG['process_start'](**update), client)
-                # setup io callbacks
-                outcb = partial(self.do_children_io, client,
-                                container_uuid, 'stdout')
-                errcb = partial(self.do_children_io, client,
-                                container_uuid, 'stderr')
-                container.processes[pid].stdout.read_until_close(outcb, outcb)
-                container.processes[pid].stderr.read_until_close(errcb, errcb)
+                self.container_owner[container.uuid] = client
 
+            # now deal with the process itself
+            update = {'api': 'up_rpc_rep',
+                      'type': 'process_start',
+                      'container_uuid': container_uuid,
+                      'pid': pid,
+                      }
+            self.upstream_rpc_server.sendmsg(
+                RPC_MSG['process_start'](**update), client)
+            # setup io callbacks
+            outcb = partial(self.do_children_io, client, container_uuid,
+                            'stdout')
+            errcb = partial(self.do_children_io, client, container_uuid,
+                            'stderr')
+            container.processes[pid].stdout.read_until_close(outcb, outcb)
+            container.processes[pid].stderr.read_until_close(errcb, errcb)
         elif msg.type == 'kill':
             logger.info("asked to kill container: %r", msg)
             response = self.container_manager.kill(msg.container_uuid)
@@ -207,16 +202,30 @@ class Daemon(object):
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
                     clientid = container.clientids[pid]
-                    remaining_pids = [p for p in container.processes.keys()
-                                      if p != pid]
+
+                    # first, send a process_exit
                     msg = {'api': 'up_rpc_rep',
+                           'type': 'process_exit',
                            'status': str(status),
                            'container_uuid': container.uuid,
                            }
+                    self.upstream_rpc_server.sendmsg(
+                            RPC_MSG['process_exit'](**msg), clientid)
+                    # Remove the pid of process that is finished
+                    container.processes.pop(pid, None)
+                    self.container_manager.pids.pop(pid, None)
+                    logger.info("Process %s in Container %s has finised.",
+                                pid, container.uuid)
 
-                    if not remaining_pids:
-                        msg['type'] = 'exit'
-                        msg['profile_data'] = dict()
+                    # if this process was owner of the container,
+                    # kill everything
+                    if self.container_owner[container.uuid] == clientid:
+                        # deal with container exit
+                        msg = {'api': 'up_rpc_rep',
+                               'type': 'exit',
+                               'container_uuid': container.uuid,
+                               'profile_data': dict(),
+                               }
                         pp = container.power
                         if pp['policy']:
                             pp['manager'].reset_all()
@@ -237,16 +246,7 @@ class Daemon(object):
                         self.container_manager.delete(container.uuid)
                         self.upstream_rpc_server.sendmsg(
                                 RPC_MSG['exit'](**msg), clientid)
-                    else:
-                        msg['type'] = 'process_exit'
-                        # Remove the pid of process that is finished
-                        container.processes.pop(pid, None)
-                        self.container_manager.pids.pop(pid, None)
-                        logger.info("Process %s in Container %s has finised.",
-                                    pid, container.uuid)
-                        self.upstream_rpc_server.sendmsg(
-                                RPC_MSG['process_exit'](**msg), clientid)
-
+                        del self.container_owner[container.uuid]
             else:
                 logger.debug("child update ignored")
                 pass
