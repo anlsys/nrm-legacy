@@ -28,11 +28,11 @@ class ResourceManager(object):
         #  - cpus are exclusive
         #  - memories exclusive if more than one left
         if len(self.available.cpus) >= request.cpus:
-            retcpus = self.available.cpus[:request.cpus]
+            retcpus = sorted(self.available.cpus)[:request.cpus]
         else:
             retcpus = []
         if len(self.available.mems) > 1:
-            retmems = self.available.mems[:request.mems]
+            retmems = sorted(self.available.mems)[:request.mems]
         else:
             retmems = self.available.mems
         ret = resources(retcpus, retmems)
