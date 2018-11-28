@@ -34,6 +34,22 @@ class CommandLineInterface(object):
 
         self.client.wait_connected()
 
+    def do_listen(self, argv):
+        """ Connect to the NRM and listen for pub/sub messages."""
+        upstream_pub_port = 2345
+        upstream_pub_param = "tcp://localhost:%d" % (upstream_pub_port)
+        self.pub_client = nrm.messaging.UpstreamPubClient(upstream_pub_param)
+        self.pub_client.wait_connected()
+
+        while(True):
+            msg = self.pub_client.recvmsg()
+            if argv.uuid:
+                uuid = getattr(msg, 'container_uuid', None)
+                if argv.container == uuid:
+                    logger.info("pub message", msg)
+            else:
+                logger.info("pub message", msg)
+
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
         in it.
@@ -170,6 +186,13 @@ class CommandLineInterface(object):
         # list containers
         parser_list = subparsers.add_parser("list")
         parser_list.set_defaults(func=self.do_list)
+
+        # listen
+        parser_listen = subparsers.add_parser("listen")
+        parser_listen.add_argument("-u", "--uuid",
+                                   help="container uuid to listen for",
+                                   default=None)
+        parser_listen.set_defaults(func=self.do_listen)
 
         # setpowerlimit
         parser_setpower = subparsers.add_parser("setpower")
