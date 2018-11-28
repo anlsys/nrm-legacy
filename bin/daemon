@@ -25,7 +25,8 @@ def main(argv=None):
   args, remaining_argv = conf_parser.parse_known_args()
 
   defaults = { "log":"/tmp/argo_daemon.log"
-             , "log_power":"/tmp/argo_daemon_power.log" }
+             , "log_power":"/tmp/argo_daemon_power.log"
+             , "powerstrategy":"0" }
 
   if args.print_defaults:
     print defaults
@@ -38,6 +39,7 @@ def main(argv=None):
   parser.set_defaults(**defaults)
   parser.add_argument("--log", help="Main log file.",metavar="FILE")
   parser.add_argument("--log_power", help="Power data log file (High throughput).",metavar="FILE")
+  parser.add_argument("--powerstrategy", help="Power management strategy.",metavar="STRATEGY")
   args = parser.parse_args(remaining_argv)
   nrm.daemon.runner(config=args)
   return(0)

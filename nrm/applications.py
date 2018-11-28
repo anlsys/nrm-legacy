@@ -58,6 +58,7 @@ class Application(object):
     def update_progress(self, msg):
         """Update the progress tracking."""
         assert self.progress
+        logger.info("received progress message: "+str(msg))
 
     def update_phase_context(self, msg):
         """Update the phase contextual information."""

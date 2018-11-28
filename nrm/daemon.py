@@ -20,7 +20,7 @@ RPC_MSG = MSGTYPES['up_rpc_rep']
 PUB_MSG = MSGTYPES['up_pub']
 
 logger = logging.getLogger('nrm')
-logger_power = logging.getLogger('power')
+
 
 class Daemon(object):
 
@@ -169,6 +169,7 @@ class Daemon(object):
 
     def do_control(self):
         plan = self.controller.planify(self.target, self.machine_info)
+        logger.info("Controller chose plan " + str(plan))
         action, actuator = plan
         if action:
             self.controller.execute(action, actuator)
@@ -321,15 +322,15 @@ class Daemon(object):
 def runner(config):
     ioloop.install()
 
-    logger.setLevel(logging.DEBUG)
-    logger_power.setLevel(logging.DEBUG)
-
     if config.log:
-        print("Logging to %s" % config.log)
+        print("Logging nrm to %s" % config.log)
+        logger.setLevel(logging.DEBUG)
         logger.addHandler(logging.FileHandler(config.log))
 
     if config.log_power:
         print("Logging power data to %s" % config.log_power)
+        logger_power = logging.getLogger('power')
+        logger_power.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(message)s')
         handler = logging.FileHandler(config.log_power)
         handler.setFormatter(formatter)

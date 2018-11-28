@@ -12,7 +12,6 @@ import uuid
 
 logger = logging.getLogger('perf-wrapper')
 
-
 class PerfWrapper(object):
 
     """Implements middleware between the Linux perf and
@@ -49,6 +48,8 @@ class PerfWrapper(object):
 
         # retrieve our container uuid
         self.container_uuid = os.environ.get('ARGO_CONTAINER_UUID')
+        # logger.error("container uuid:",str(self.container_uuid))
+        # logger.error("environ:",dict(os.environ))
         if self.container_uuid is None:
             logger.error("missing container uuid")
             exit(1)
@@ -73,12 +74,19 @@ class PerfWrapper(object):
         parser.add_argument("-f", "--frequency",
                             help="sampling frequency in ms",
                             type=int, default=1000)
+        parser.add_argument("-l", "--logfile",
+                            help="perf-wrapper log file",
+                            type=str, default="/tmp/argo-perf-wrapper.log")
         parser.add_argument("cmd", help="command and arguments",
                             nargs=argparse.REMAINDER)
         args = parser.parse_args()
 
         if args.verbose:
             logger.setLevel(logging.DEBUG)
+
+        if args.logfile:
+            logger.setLevel(logging.DEBUG)
+            logger.addHandler(logging.FileHandler(args.logfile))
 
         logger.info("cmd: %r", args.cmd)
 
@@ -141,6 +149,6 @@ class PerfWrapper(object):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
+    # logging.basicConfig(level=logging.INFO)
     wrapper = PerfWrapper()
     wrapper.main()
