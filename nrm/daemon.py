@@ -100,14 +100,14 @@ class Daemon(object):
                     p = container.power['profile']
                     p['start'] = self.machine_info['energy']['energy']
                     p['start']['time'] = self.machine_info['time']
-                update = {'api': 'up_rpc_rep',
-                          'type': 'start',
+                update = {'api': 'up_pub',
+                          'type': 'container_start',
                           'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
                           'power': container.power['policy'] or dict()
                           }
-                self.upstream_rpc_server.sendmsg(RPC_MSG['start'](**update),
-                                                 client)
+                self.upstream_pub_server.sendmsg(
+                        PUB_MSG['container_start'](**update))
                 self.container_owner[container.uuid] = client
 
             # now deal with the process itself
@@ -219,8 +219,8 @@ class Daemon(object):
                     # kill everything
                     if self.container_owner[container.uuid] == clientid:
                         # deal with container exit
-                        msg = {'api': 'up_rpc_rep',
-                               'type': 'exit',
+                        msg = {'api': 'up_pub',
+                               'type': 'container_exit',
                                'container_uuid': container.uuid,
                                'profile_data': dict(),
                                }
@@ -242,8 +242,8 @@ class Daemon(object):
                                         container.uuid, diff)
                             msg['profile_data'] = diff
                         self.container_manager.delete(container.uuid)
-                        self.upstream_rpc_server.sendmsg(
-                                RPC_MSG['exit'](**msg), clientid)
+                        self.upstream_pub_server.sendmsg(
+                                PUB_MSG['container_exit'](**msg))
                         del self.container_owner[container.uuid]
             else:
                 logger.debug("child update ignored")

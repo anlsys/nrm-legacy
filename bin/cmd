@@ -44,13 +44,14 @@ class CommandLineInterface(object):
         # the command a container uuid as a way to make sure that we can make
         # the command idempotent.
         environ = os.environ
+        container_uuid = argv.ucontainername or str(uuid.uuid4())
         command = {'api': 'up_rpc_req',
                    'type': 'run',
                    'manifest': argv.manifest,
                    'path': argv.command,
                    'args': argv.args,
                    'environ': dict(environ),
-                   'container_uuid': argv.ucontainername or str(uuid.uuid4()),
+                   'container_uuid': container_uuid,
                    }
         msg = RPC_MSG['run'](**command)
         # command fsm
@@ -63,12 +64,7 @@ class CommandLineInterface(object):
         # the first message tells us if we started a container or not
         msg = self.client.recvmsg()
         assert msg.api == 'up_rpc_rep'
-        assert msg.type in ['start', 'process_start']
-        new_container = False
-        if msg.type == 'start':
-            new_container = True
-            msg = self.client.recvmsg()
-            assert msg.type == 'process_start'
+        assert msg.type == 'process_start'
         state = 'started'
         while(True):
             msg = self.client.recvmsg()
@@ -85,17 +81,13 @@ class CommandLineInterface(object):
                     erreof = True
             elif msg.type == 'process_exit':
                 logger.info("process ended: %r", msg)
-                if not new_container:
-                    state = 'exiting'
-            elif msg.type == 'exit':
-                if state == 'started':
-                    state = 'exiting'
-                    exitmsg = msg
-                else:
-                    logger.info("unexpected exit message: %r", msg)
+                state = 'exiting'
+                exitmsg = msg
+            else:
+                logger.error("unexpected message: %r", msg)
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
-                logger.info("container ended: %r", exitmsg)
+                logger.info("command ended: %r", exitmsg)
                 break
 
     def do_list(self, argv):

@@ -29,23 +29,24 @@ MSGFORMATS['up_rpc_req'] = {'list': {},
                             'kill': {'container_uuid': basestring},
                             'setpower': {'limit': basestring},
                             }
-MSGFORMATS['up_rpc_rep'] = {'start': {'container_uuid': basestring,
-                                      'errno': int,
-                                      'power': dict},
-                            'list': {'payload': list},
+MSGFORMATS['up_rpc_rep'] = {'list': {'payload': list},
                             'stdout': {'container_uuid': basestring,
                                        'payload': basestring},
                             'stderr': {'container_uuid': basestring,
                                        'payload': basestring},
-                            'exit': {'container_uuid': basestring,
-                                     'profile_data': dict},
                             'process_start': {'container_uuid': basestring,
                                               'pid': int},
                             'process_exit': {'container_uuid': basestring,
                                              'status': basestring},
                             'getpower': {'limit': basestring},
                             }
-MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float}}
+MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float},
+                        'container_start': {'container_uuid': basestring,
+                                            'errno': int,
+                                            'power': dict},
+                        'container_exit': {'container_uuid': basestring,
+                                           'profile_data': dict},
+                        }
 
 # Mirror of the message formats, using namedtuples as the actual transport
 # for users of this messaging layer.
