@@ -25,7 +25,6 @@ logger = logging.getLogger('nrm')
 class Daemon(object):
     def __init__(self):
         self.target = 100.0
-        self.container_owner = dict()
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -89,7 +88,7 @@ class Daemon(object):
                       }
             pid, container = self.container_manager.create(params)
             container_uuid = container.uuid
-            if len(container.processes.keys()) == 1:
+            if len(container.processes) == 1:
                 if container.power['policy']:
                     container.power['manager'] = PowerPolicyManager(
                             container.resources['cpus'],
@@ -108,7 +107,6 @@ class Daemon(object):
                           }
                 self.upstream_pub_server.sendmsg(
                         PUB_MSG['container_start'](**update))
-                self.container_owner[container.uuid] = client
 
             # now deal with the process itself
             update = {'api': 'up_rpc_rep',
@@ -215,9 +213,9 @@ class Daemon(object):
                     logger.info("Process %s in Container %s has finised.",
                                 pid, container.uuid)
 
-                    # if this process was owner of the container,
+                    # if this is the last process in the container,
                     # kill everything
-                    if self.container_owner[container.uuid] == clientid:
+                    if len(container.processes) == 0:
                         # deal with container exit
                         msg = {'api': 'up_pub',
                                'type': 'container_exit',
@@ -244,7 +242,6 @@ class Daemon(object):
                         self.container_manager.delete(container.uuid)
                         self.upstream_pub_server.sendmsg(
                                 PUB_MSG['container_exit'](**msg))
-                        del self.container_owner[container.uuid]
             else:
                 logger.debug("child update ignored")
                 pass
