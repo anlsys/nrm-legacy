@@ -176,3 +176,48 @@ class UpstreamPubServer(object):
         """Sends a message."""
         logger.debug("sending message: %r", msg)
         self.socket.send(msg2wire(msg))
+
+
+class UpstreamPubClient(object):
+
+    """Implements the message layer client to the upstream Pub API."""
+
+    def __init__(self, address):
+        self.address = address
+        self.zmq_context = zmq.Context()
+        self.socket = self.zmq_context.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.SUBSCRIBE, '')
+        self.socket.connect(address)
+
+    def wait_connected(self):
+        """Creates a monitor socket and wait for the connect event."""
+        monitor = self.socket.get_monitor_socket()
+        while True:
+            msg = zmq.utils.monitor.recv_monitor_message(monitor)
+            logger.debug("monitor message: %r", msg)
+            if int(msg['event']) == zmq.EVENT_CONNECTED:
+                logger.debug("socket connected")
+                break
+        self.socket.disable_monitor()
+
+    def recvmsg(self):
+        """Receives a message and returns it."""
+        frames = self.socket.recv_multipart()
+        logger.debug("received message: %r", frames)
+        assert len(frames) == 1
+        return wire2msg(frames[0])
+
+    def do_recv_callback(self, frames):
+        """Receives a message from zmqstream.on_recv, passing it to a user
+        callback."""
+        logger.info("receiving message: %r", frames)
+        assert len(frames) == 1
+        msg = wire2msg(frames[0])
+        assert self.callback
+        self.callback(msg)
+
+    def setup_recv_callback(self, callback):
+        """Setup a ioloop-backed callback for receiving messages."""
+        self.stream = zmqstream.ZMQStream(self.socket)
+        self.callback = callback
+        self.stream.on_recv(self.do_recv_callback)
