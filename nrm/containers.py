@@ -4,10 +4,12 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 from subprograms import ChrtClient, NodeOSClient, resources
+import operator
 
 logger = logging.getLogger('nrm')
 Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
-                                     'power', 'processes', 'clientids'])
+                                     'power', 'processes', 'clientids',
+                                     'hwbindings'])
 
 
 class ContainerManager(object):
@@ -26,6 +28,8 @@ class ContainerManager(object):
         self.containers = dict()
         self.pids = dict()
         self.resourcemanager = rm
+        self.hwloc = rm.hwloc
+        self.nodeos = NodeOSClient()
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
 
@@ -38,6 +42,8 @@ class ContainerManager(object):
         processes = None
         clientids = None
         pp = None
+        hwbindings = None
+        bind_index = 0
 
         manifestfile = request['manifest']
         command = request['file']
@@ -69,13 +75,17 @@ class ContainerManager(object):
                 containerexistsflag = True
                 processes = container.processes
                 clientids = container.clientids
+                hwbindings = container.hwbindings
+                bind_index = len(processes)
         else:
             processes = dict()
             clientids = dict()
+            hwbindings = dict()
 
             # ask the resource manager for resources
-            req = resources(int(manifest.app.isolators.container.cpus.value),
-                            int(manifest.app.isolators.container.mems.value))
+            ncpus = int(manifest.app.isolators.container.cpus.value)
+            nmems = int(manifest.app.isolators.container.mems.value)
+            req = resources(ncpus, nmems)
             alloc = self.resourcemanager.schedule(container_name, req)
             logger.info("run: allocation: %r", alloc)
 
@@ -116,6 +126,16 @@ class ContainerManager(object):
                                 container_power['damper'] = pp.damper
                                 container_power['slowdown'] = pp.slowdown
 
+            # Compute hardware bindings
+            if hasattr(manifest.app.isolators, 'hwbind'):
+                manifest_hwbind = manifest.app.isolators.hwbind
+                if hasattr(manifest_hwbind, 'enabled'):
+                    if manifest_hwbind.enabled in ["1", "True"]:
+                        hwbindings['enabled'] = True
+                        hwbindings['distrib'] = sorted(self.hwloc.distrib(
+                                                ncpus, alloc), key=operator.
+                                                attrgetter('cpus'))
+
         # build context to execute
         # environ['PATH'] = ("/usr/local/sbin:"
         #                   "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
@@ -131,6 +151,17 @@ class ContainerManager(object):
                 environ['NRM_DAMPER'] = container.power['damper']
             else:
                 environ['NRM_DAMPER'] = pp.damper
+
+        # Use hwloc-bind to launch each process in the conatiner by prepending
+        # it as an argument to the command line, if enabled in manifest.
+        # The hardware binding computed using hwloc-distrib is used here
+        # --single
+        if bool(hwbindings) and hwbindings['enabled']:
+            argv.append('hwloc-bind')
+            # argv.append('--single')
+            argv.append('core:'+str(hwbindings['distrib'][bind_index].cpus[0]))
+            argv.append('--membind')
+            argv.append('numa:'+str(hwbindings['distrib'][bind_index].mems[0]))
 
         argv.append(command)
         argv.extend(args)
@@ -148,7 +179,7 @@ class ContainerManager(object):
         else:
             container = Container(container_name, manifest,
                                   container_resources, container_power,
-                                  processes, clientids)
+                                  processes, clientids, hwbindings)
             self.pids[process.pid] = container
             self.containers[container_name] = container
             logger.info("Container %s created and running : %r",

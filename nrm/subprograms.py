@@ -32,7 +32,7 @@ def list2bitmask(l):
     """Convert a list into a bitmask."""
     m = 0
     for e in l:
-        m |= 1 << e
+        m |= 1 << int(e)
     return hex(m)
 
 

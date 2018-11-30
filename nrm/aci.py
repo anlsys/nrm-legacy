@@ -202,6 +202,29 @@ class Power(SpecField):
         return True
 
 
+class HwBind(SpecField):
+
+    """Hardware bindings for a container."""
+
+    fields = {"enabled": spec(unicode, False),
+              }
+
+    def __init__(self):
+        """Create empty hardware bindings  settings object."""
+        pass
+
+    def load(self, data):
+        """Load hardware bindings settings."""
+        ret = super(HwBind, self).load(data)
+        if not ret:
+            return ret
+        if self.enabled not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value for hardware bindings enabled: %s",
+                         self.enabled)
+            return False
+        return True
+
+
 class IsolatorList(SpecField):
 
     """Represent the list of isolator in a Manifest."""
@@ -210,6 +233,7 @@ class IsolatorList(SpecField):
              "argo/container": spec(Container, True),
              "argo/perfwrapper": spec(PerfWrapper, False),
              "argo/power": spec(Power, False),
+             "argo/hwbind": spec(HwBind, False),
              }
 
     def __init__(self):

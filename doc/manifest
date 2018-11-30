@@ -14,14 +14,14 @@
 			{
 				"name": "argo/container",
 				"value": {
-					"cpus": "4",
-					"mems": "1"
+					"cpus": "24",
+					"mems": "2"
 				}
 			},
 			{
 				"name": "argo/perfwrapper",
 				"value": {
-					 "enabled": "1"
+					 "enabled": "0"
 				}
 			},
 			{
@@ -30,8 +30,14 @@
 					"enabled": "1",
 					"profile": "1",
 					"policy": "NONE",
-					"damper": "0.1",
+					"damper": "1000000000",
 					"slowdown": "1.1"
+				}
+			},
+			{
+				"name": "argo/hwbind",
+				"value": {
+					 "enabled": "1"
 				}
 			}
 		]
