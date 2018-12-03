@@ -78,7 +78,7 @@ class PowerActuator(object):
                     action.command, action.delta, action.target)
         # sensor_manager is a SensorManager, which is not only about sensing
         # but also about setting power limits.
-        self.sensor_manager.set_powerlimit(action.target, action.command)
+        # self.sensor_manager.set_powerlimit(action.target, action.command)
 
     def update(self, action):
         pass

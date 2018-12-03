@@ -39,6 +39,8 @@ class Application(object):
         # TODO: not a real model
         if command not in self.thread_fsm_table[self.thread_state]:
             return 0.0
+        logger.info("SELF.PROGRESS: %s" % self.progress)
+        logger.info("SELF.THREADS: %s" % self.threads)
         speed = float(self.progress)/float(self.threads['cur'])
         if command == 'i':
             return speed
