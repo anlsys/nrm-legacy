@@ -168,9 +168,11 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
+        logger.info("Asking controller to plan for target %s using machine info %s" % (self.target, self.machine_info))
         plan = self.controller.planify(self.target, self.machine_info)
         logger.info("Controller chose plan " + str(plan))
         action, actuator = plan
+        logger.info("Action target:%s command:%s delta:%s was computed by the power controller." %(action.target,action.command,action.delta))
         if action:
             self.controller.execute(action, actuator)
             self.controller.update(action, actuator)
