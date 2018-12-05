@@ -333,8 +333,26 @@ def runner(config):
         logger.setLevel(logging.DEBUG)
         logger.addHandler(logging.FileHandler(config.log))
 
+    if config.log_progress:
+        print("Logging progress data to %s" % config.log_progress)
+        logger_progress = logging.getLogger('progress')
+        logger_progress.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(message)s')
+        handler = logging.FileHandler(config.log_progress)
+        handler.setFormatter(formatter)
+        logger_progress.addHandler(handler)
+
+    if config.log_hardwareprogress:
+        print("Logging progress data to %s" % config.log_hardwareprogress)
+        logger_hardwareprogress = logging.getLogger('hardwareprogress')
+        logger_hardwareprogress.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(message)s')
+        handler = logging.FileHandler(config.log_hardwareprogress)
+        handler.setFormatter(formatter)
+        logger_hardwareprogress.addHandler(handler)
+
     if config.log_power:
-        print("Logging power data to %s" % config.log_power)
+        print("Logging progress data to %s" % config.log_power)
         logger_power = logging.getLogger('power')
         logger_power.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(message)s')

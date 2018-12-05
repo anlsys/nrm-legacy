@@ -1,9 +1,11 @@
 from __future__ import print_function
 
 import logging
+import time
 
 logger = logging.getLogger('nrm')
-
+logger_progress = logging.getLogger('progress')
+logger_hardwareprogress = logging.getLogger('hardwareprogress')
 
 class Application(object):
 
@@ -29,10 +31,12 @@ class Application(object):
         """Update the progress tracking."""
         assert self.progress
         logger.info("received progress message: "+str(msg))
+        logger_progress.info("%s %s" % (time.time(),msg['payload']))
 
     def update_hardwareprogress(self, msg):
         """Update the progress tracking."""
         logger.info("received progress message: "+str(msg))
+        logger_hardwareprogress.info("%s %s" % (time.time(),msg['payload']))
         if not self.hardwareprogress:
             logger.debug("Starting to log hardware progress.")
             self.hardwareprogress = True

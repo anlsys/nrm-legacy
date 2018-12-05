@@ -1,4 +1,6 @@
 {
   "log":"/tmp/daemon_log.log"
   "log_power":"/tmp/daemon_power.log"
+  "log_progress":"/tmp/daemon_progress.log"
+  "log_hardwareprogress":"/tmp/daemon_hardwareprogress.log"
 }
