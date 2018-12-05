@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller, ApplicationActuator, PowerActuator
+from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
 import json
@@ -45,11 +45,6 @@ class Daemon(object):
                 cid = msg['container']
                 container = self.container_manager.containers[cid]
                 self.application_manager.register(msg, container)
-            elif event == 'threads':
-                uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    app = self.application_manager.applications[uuid]
-                    app.update_threads(msg)
             elif event == 'progress':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
@@ -182,6 +177,8 @@ class Daemon(object):
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
             ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
+        elif signum == signal.SIGTERM:
+            ioloop.IOLoop.current().add_callback_from_signal(self.do_shutdown)
         elif signum == signal.SIGCHLD:
             ioloop.IOLoop.current().add_callback_from_signal(self.do_children)
         else:
@@ -299,9 +296,8 @@ class Daemon(object):
         self.container_manager = ContainerManager(self.resource_manager)
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        aa = ApplicationActuator(self.application_manager, self.downstream_pub)
         pa = PowerActuator(self.sensor_manager)
-        self.controller = Controller([aa, pa])
+        self.controller = Controller([pa])
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()
@@ -315,6 +311,7 @@ class Daemon(object):
 
         # take care of signals
         signal.signal(signal.SIGINT, self.do_signal)
+        signal.signal(signal.SIGTERM, self.do_signal)
         signal.signal(signal.SIGCHLD, self.do_signal)
 
         ioloop.IOLoop.current().start()

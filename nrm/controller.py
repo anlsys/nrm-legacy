@@ -14,44 +14,6 @@ class Action(object):
         self.command = command
         self.delta = delta
 
-
-class ApplicationActuator(object):
-
-    """Actuator in charge of application thread control."""
-
-    def __init__(self, am, pubstream):
-        self.application_manager = am
-        self.pubstream = pubstream
-
-    def available_actions(self, target):
-        ret = []
-        for identity, application in \
-                self.application_manager.applications.iteritems():
-            if target in application.get_allowed_thread_requests():
-                delta = application.get_thread_request_impact(target)
-                ret.append(Action(application, target, delta))
-        return ret
-
-    def execute(self, action):
-        target_threads = action.target.threads
-        update = {'type': 'application',
-                  'command': 'threads',
-                  'uuid': action.target.uuid,
-                  'event': 'threads',
-                  }
-        if action.command == 'i':
-            payload = target_threads['cur'] + 1
-        elif action.command == 'd':
-            payload = target_threads['cur'] - 1
-        else:
-            assert False, "impossible command"
-        update['payload'] = payload
-        self.pubstream.send_json(update)
-
-    def update(self, action):
-        action.target.do_thread_transition(action.command)
-
-
 class PowerActuator(object):
 
     """Actuator in charge of power control."""
