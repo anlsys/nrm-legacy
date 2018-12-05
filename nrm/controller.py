@@ -1,9 +1,10 @@
 from __future__ import print_function
 
 import logging
+import time
 
 logger = logging.getLogger('nrm')
-
+logger_power = logging.getLogger('power')
 
 class Action(object):
 
@@ -55,24 +56,29 @@ class Controller(object):
 
     def planify(self, target, machineinfo):
         """Plan the next action for the control loop."""
-        total_power = machineinfo['energy']['power']['total']
-        direction = None
-        if total_power < target:
-            direction = 'i'
-        elif total_power > target:
-            direction = 'd'
+        # current_e = float(machineinfo['energy']['energy']['cumulative']['package-0'])/(1000*1000) # in joules
+        current_p = float(machineinfo['energy']['power']['p0'])/(1000*1000) # in joules
+        current_p = float(machineinfo['energy']['power']['p1'])/(1000*1000) # in joules
+        logger_power.info("%s %s %s" % (time.time(),current_p,current_p))
+        return (None,None)
 
-        if direction:
-            actions = []
-            for act in self.actuators:
-                newactions = act.available_actions(direction)
-                actions.extend([(a, act) for a in newactions])
-            if actions:
-                # TODO: better choice
-                actions.sort(key=lambda x: x[0].delta)
-                return actions.pop(0)
-            else:
-                return (None, None)
+        # direction = None
+        # if total_power < target:
+            # direction = 'i'
+        # elif total_power > target:
+            # direction = 'd'
+
+        # if direction:
+            # actions = []
+            # for act in self.actuators:
+                # newactions = act.available_actions(direction)
+                # actions.extend([(a, act) for a in newactions])
+            # if actions:
+                # # TODO: better choice
+                # actions.sort(key=lambda x: x[0].delta)
+                # return actions.pop(0)
+            # else:
+                # return (None, None)
 
     def execute(self, action, actuator):
         """Build the action for the appropriate manager."""

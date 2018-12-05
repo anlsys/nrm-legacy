@@ -20,7 +20,7 @@ RPC_MSG = MSGTYPES['up_rpc_rep']
 PUB_MSG = MSGTYPES['up_pub']
 
 logger = logging.getLogger('nrm')
-
+logger_power = logging.getLogger('power')
 
 class Daemon(object):
 
