@@ -29,9 +29,10 @@ class PerfWrapper(object):
 
     def progress_report(self, progress):
         update = {'type': 'application',
-                  'event': 'progress',
+                  'event': 'hardware-progress',
                   'payload': progress,
                   'uuid': self.app_uuid,
+                  'container': self.container_uuid,
                   }
         self.downstream_pub_socket.send_json(update)
 

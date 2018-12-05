@@ -18,16 +18,24 @@ class Application(object):
                         'min_ask_i': {'done': 'stable', 'noop': 'noop'},
                         'noop': {}}
 
-    def __init__(self, uuid, container, progress, phase_contexts):
+    def __init__(self, uuid, container, progress, hardwareprogress, phase_contexts):
         self.uuid = uuid
         self.container_uuid = container
         self.progress = progress
+        self.hardwareprogress = hardwareprogress
         self.phase_contexts = phase_contexts
 
     def update_progress(self, msg):
         """Update the progress tracking."""
         assert self.progress
         logger.info("received progress message: "+str(msg))
+
+    def update_hardwareprogress(self, msg):
+        """Update the progress tracking."""
+        logger.info("received progress message: "+str(msg))
+        if not self.hardwareprogress:
+            logger.debug("Starting to log hardware progress.")
+            self.hardwareprogress = True
 
     def update_phase_context(self, msg):
         """Update the phase contextual information."""
@@ -50,6 +58,7 @@ class ApplicationManager(object):
         uuid = msg['uuid']
         container_uuid = msg['container']
         progress = msg['progress']
+        hardwareprogress = None
         phase_contexts = dict()
         phase_context_keys = ['set', 'startcompute', 'endcompute',
                               'startbarrier', 'endbarrier']
@@ -60,7 +69,7 @@ class ApplicationManager(object):
                 phase_contexts[id]['set'] = False
         else:
             phase_contexts = None
-        self.applications[uuid] = Application(uuid, container_uuid, progress, phase_contexts)
+        self.applications[uuid] = Application(uuid, container_uuid, progress, hardwareprogress, phase_contexts)
 
     def delete(self, uuid):
         """Delete an application from the register."""

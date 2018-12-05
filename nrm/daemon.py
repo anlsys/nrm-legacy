@@ -50,6 +50,12 @@ class Daemon(object):
                 if uuid in self.application_manager.applications:
                     app = self.application_manager.applications[uuid]
                     app.update_progress(msg)
+            elif event == 'hardware-progress':
+                cid = msg['container']
+                for app_uuid in self.application_manager.applications:
+                    app = self.application_manager.applications[app_uuid]
+                    if app.container_uuid == cid:
+                        app.update_hardwareprogress(msg)
             elif event == 'phase_context':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:
@@ -253,6 +259,7 @@ class Daemon(object):
     def do_shutdown(self):
         self.sensor_manager.stop()
         ioloop.IOLoop.current().stop()
+        context.term()
 
     def main(self):
         # Bind address for downstream clients
@@ -315,6 +322,7 @@ class Daemon(object):
         signal.signal(signal.SIGCHLD, self.do_signal)
 
         ioloop.IOLoop.current().start()
+        context.term()
 
 
 def runner(config):
