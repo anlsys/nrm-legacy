@@ -4,6 +4,7 @@ import logging
 import xml.etree.ElementTree
 import tornado.process as process
 import subprocess
+import os
 
 logger = logging.getLogger('nrm')
 resources = collections.namedtuple("Resources", ["cpus", "mems"])
@@ -42,7 +43,14 @@ class NodeOSClient(object):
 
     def __init__(self):
         """Load client configuration."""
-        self.prefix = "argo_nodeos_config"
+        if 'ARGO_NODEOS_CONFIG' in os.environ:
+            logger.info("NodeOSClient: bypassing argo_nodeos_config with %s\n"
+                        % os.environ['ARGO_NODEOS_CONFIG'])
+            self.prefix = os.environ['ARGO_NODEOS_CONFIG']
+        else:
+            logger.info("NodeOSClient: using argo_nodeos_config from path")
+            self.prefix = "argo_nodeos_config"
+
 
     def getavailable(self):
         """Gather available resources."""

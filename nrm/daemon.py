@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller, PowerActuator
+from controller import Controller, PowerActuator, DiscretizedPowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
 import json
@@ -169,7 +169,9 @@ class Daemon(object):
         logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        logger.info("Asking controller to plan for target %s using machine info %s" % (self.target, self.machine_info))
+        logger.info(
+                "Asking controller to plan for target %s using machine info %s"
+                % (self.target, self.machine_info))
         plan = self.controller.planify(self.target, self.machine_info)
         logger.info("Controller chose plan " + str(plan))
         action, actuator = plan
@@ -259,7 +261,6 @@ class Daemon(object):
     def do_shutdown(self):
         self.sensor_manager.stop()
         ioloop.IOLoop.current().stop()
-        context.term()
 
     def main(self):
         # Bind address for downstream clients
@@ -303,7 +304,8 @@ class Daemon(object):
         self.container_manager = ContainerManager(self.resource_manager)
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        pa = PowerActuator(self.sensor_manager)
+        pa = PowerActuator(self.sensor_manager,
+                           strategy=self.config['powerlevel'])
         self.controller = Controller([pa])
 
         self.sensor_manager.start()
@@ -322,7 +324,6 @@ class Daemon(object):
         signal.signal(signal.SIGCHLD, self.do_signal)
 
         ioloop.IOLoop.current().start()
-        context.term()
 
 
 def runner(config):
