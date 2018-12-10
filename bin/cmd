@@ -7,9 +7,12 @@ import signal
 import os
 import nrm.messaging
 import uuid
+import sys
+import collections
 
 RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
 logger = logging.getLogger('nrm')
+KillArgs = collections.namedtuple("Kill", ["uuid"])
 
 
 class CommandLineInterface(object):
@@ -19,8 +22,14 @@ class CommandLineInterface(object):
     def __init__(self):
         pass
 
-    def do_signal(self, signum, stackframe):
-        logger.info("received signal %d, exiting", signum)
+    def do_signal(self, uuid, signum, stackframe):
+        if uuid:
+            logger.info("received signal %d, killing the application..",
+                        signum)
+            self.do_kill(KillArgs(uuid))
+            logger.info("killed the application.", signum)
+        else:
+            logger.info("received signal %d, exiting", signum)
         exit(1)
 
     def setup(self):
@@ -30,7 +39,9 @@ class CommandLineInterface(object):
         self.client = nrm.messaging.UpstreamRPCClient(upstream_client_param)
 
         # take care of signals
-        signal.signal(signal.SIGINT, self.do_signal)
+        def handler(signum, frame):
+            self.do_signal(None, signum, frame)
+        signal.signal(signal.SIGINT, handler)
 
         self.client.wait_connected()
 
@@ -81,6 +92,11 @@ class CommandLineInterface(object):
         msg = self.client.recvmsg()
         assert msg.api == 'up_rpc_rep'
         assert msg.type == 'process_start'
+
+        def handler(signum, frame):
+            self.do_signal(msg.container_uuid, signum, frame)
+        signal.signal(signal.SIGINT, handler)
+
         state = 'started'
         while(True):
             msg = self.client.recvmsg()
@@ -104,6 +120,7 @@ class CommandLineInterface(object):
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
                 logger.info("command ended: %r", exitmsg)
+                sys.exit(int(exitmsg.status))
                 break
 
     def do_list(self, argv):

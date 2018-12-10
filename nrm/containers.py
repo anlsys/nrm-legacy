@@ -162,12 +162,13 @@ class ContainerManager(object):
         if uuid in self.containers:
             c = self.containers[uuid]
             logger.debug("killing %r:", c)
-            try:
-                c.process.proc.terminate()
-            except OSError:
-                pass
+            for p in c.processes.values():
+                try:
+                    p.terminate()
+                except OSError:
+                    logging.error("OS error: could not terminate process.")
 
     def list(self):
         """List the containers in the system."""
-        return [{'uuid': c.uuid, 'pid': c.process.pid} for c in
-                self.containers.values()]
+        return [{'uuid': c.uuid, 'pid': c.processes.keys()}
+                for c in self.containers.values()]

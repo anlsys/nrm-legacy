@@ -171,6 +171,7 @@ class UpstreamPubServer(object):
         self.address = address
         self.zmq_context = zmq.Context()
         self.socket = self.zmq_context.socket(zmq.PUB)
+        self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.bind(address)
 
     def sendmsg(self, msg):
