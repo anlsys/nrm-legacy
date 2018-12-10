@@ -91,7 +91,13 @@ class Controller(object):
 
     def planify(self, target, machineinfo):
         """Plan the next action for the control loop."""
-        total_power = machineinfo['energy']['power']['total']
+        try:
+            total_power = machineinfo['energy']['power']['total']
+        except TypeError:
+            logging.error("\"machineinfo\" malformed. Can not run "
+                          "control loop.")
+            return (None, None)
+
         direction = None
         if total_power < target:
             direction = 'i'

@@ -6,9 +6,13 @@ import logging
 import signal
 import os
 import nrm.messaging
+import uuid
+import sys
+import collections
 
 RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
 logger = logging.getLogger('nrm')
+KillArgs = collections.namedtuple("Kill", ["uuid"])
 
 
 class CommandLineInterface(object):
@@ -18,8 +22,14 @@ class CommandLineInterface(object):
     def __init__(self):
         pass
 
-    def do_signal(self, signum, stackframe):
-        logger.info("received signal %d, exiting", signum)
+    def do_signal(self, uuid, signum, stackframe):
+        if uuid:
+            logger.info("received signal %d, killing the application..",
+                        signum)
+            self.do_kill(KillArgs(uuid))
+            logger.info("killed the application.", signum)
+        else:
+            logger.info("received signal %d, exiting", signum)
         exit(1)
 
     def setup(self):
@@ -29,9 +39,27 @@ class CommandLineInterface(object):
         self.client = nrm.messaging.UpstreamRPCClient(upstream_client_param)
 
         # take care of signals
-        signal.signal(signal.SIGINT, self.do_signal)
+        def handler(signum, frame):
+            self.do_signal(None, signum, frame)
+        signal.signal(signal.SIGINT, handler)
 
         self.client.wait_connected()
+
+    def do_listen(self, argv):
+        """ Connect to the NRM and listen for pub/sub messages."""
+        upstream_pub_port = 2345
+        upstream_pub_param = "tcp://localhost:%d" % (upstream_pub_port)
+        self.pub_client = nrm.messaging.UpstreamPubClient(upstream_pub_param)
+        self.pub_client.wait_connected()
+
+        while(True):
+            msg = self.pub_client.recvmsg()
+            if argv.uuid:
+                uuid = getattr(msg, 'container_uuid', None)
+                if argv.container == uuid:
+                    logger.info("pub message", msg)
+            else:
+                logger.info("pub message", msg)
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
@@ -43,13 +71,14 @@ class CommandLineInterface(object):
         # the command a container uuid as a way to make sure that we can make
         # the command idempotent.
         environ = os.environ
+        container_uuid = argv.ucontainername or str(uuid.uuid4())
         command = {'api': 'up_rpc_req',
                    'type': 'run',
                    'manifest': argv.manifest,
                    'path': argv.command,
                    'args': argv.args,
                    'environ': dict(environ),
-                   'container_uuid': str(argv.ucontainername),
+                   'container_uuid': container_uuid,
                    }
         msg = RPC_MSG['run'](**command)
         # command fsm
@@ -58,28 +87,23 @@ class CommandLineInterface(object):
         erreof = False
         exitmsg = None
         self.client.sendmsg(msg)
+
+        # the first message tells us if we started a container or not
+        msg = self.client.recvmsg()
+        assert msg.api == 'up_rpc_rep'
+        assert msg.type == 'process_start'
+
+        def handler(signum, frame):
+            self.do_signal(msg.container_uuid, signum, frame)
+        signal.signal(signal.SIGINT, handler)
+
+        state = 'started'
         while(True):
             msg = self.client.recvmsg()
             assert msg.api == 'up_rpc_rep'
-            assert msg.type in ['start', 'stdout', 'stderr', 'exit',
-                                'process_start', 'process_exit']
+            assert msg.type in ['stdout', 'stderr', 'exit', 'process_exit']
 
-            if msg.type == 'start':
-                if state == 'init':
-                    state = 'started'
-                    logger.info("container started: %r", msg)
-                else:
-                    logger.info("unexpected start message: %r", state)
-                    exit(1)
-            elif msg.type == 'process_start':
-                if state == 'init':
-                    state = 'started'
-                    logger.info("process started in existing "
-                                "container: %r""", msg)
-                else:
-                    logger.info("unexpected start message: %r", state)
-                    exit(1)
-            elif msg.type == 'stdout':
+            if msg.type == 'stdout':
                 logger.info("container msg: %r", msg)
                 if msg.payload == 'eof':
                     outeof = True
@@ -89,16 +113,14 @@ class CommandLineInterface(object):
                     erreof = True
             elif msg.type == 'process_exit':
                 logger.info("process ended: %r", msg)
-                break
-            elif msg.type == 'exit':
-                if state == 'started':
-                    state = 'exiting'
-                    exitmsg = msg
-                else:
-                    logger.info("unexpected exit message: %r", msg)
+                state = 'exiting'
+                exitmsg = msg
+            else:
+                logger.error("unexpected message: %r", msg)
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
-                logger.info("container ended: %r", exitmsg)
+                logger.info("command ended: %r", exitmsg)
+                sys.exit(int(exitmsg.status))
                 break
 
     def do_list(self, argv):
@@ -181,6 +203,13 @@ class CommandLineInterface(object):
         # list containers
         parser_list = subparsers.add_parser("list")
         parser_list.set_defaults(func=self.do_list)
+
+        # listen
+        parser_listen = subparsers.add_parser("listen")
+        parser_listen.add_argument("-u", "--uuid",
+                                   help="container uuid to listen for",
+                                   default=None)
+        parser_listen.set_defaults(func=self.do_listen)
 
         # setpowerlimit
         parser_setpower = subparsers.add_parser("setpower")

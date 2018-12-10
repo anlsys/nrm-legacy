@@ -29,24 +29,24 @@ MSGFORMATS['up_rpc_req'] = {'list': {},
                             'kill': {'container_uuid': basestring},
                             'setpower': {'limit': basestring},
                             }
-MSGFORMATS['up_rpc_rep'] = {'start': {'container_uuid': basestring,
-                                      'errno': int,
-                                      'pid': int,
-                                      'power': dict},
-                            'list': {'payload': list},
+MSGFORMATS['up_rpc_rep'] = {'list': {'payload': list},
                             'stdout': {'container_uuid': basestring,
                                        'payload': basestring},
                             'stderr': {'container_uuid': basestring,
                                        'payload': basestring},
-                            'exit': {'container_uuid': basestring,
-                                     'status': basestring,
-                                     'profile_data': dict},
-                            'process_start': {'container_uuid': basestring},
+                            'process_start': {'container_uuid': basestring,
+                                              'pid': int},
                             'process_exit': {'container_uuid': basestring,
                                              'status': basestring},
                             'getpower': {'limit': basestring},
                             }
-MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float}}
+MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float},
+                        'container_start': {'container_uuid': basestring,
+                                            'errno': int,
+                                            'power': dict},
+                        'container_exit': {'container_uuid': basestring,
+                                           'profile_data': dict},
+                        }
 
 # Mirror of the message formats, using namedtuples as the actual transport
 # for users of this messaging layer.
@@ -171,9 +171,55 @@ class UpstreamPubServer(object):
         self.address = address
         self.zmq_context = zmq.Context()
         self.socket = self.zmq_context.socket(zmq.PUB)
+        self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.bind(address)
 
     def sendmsg(self, msg):
         """Sends a message."""
         logger.debug("sending message: %r", msg)
         self.socket.send(msg2wire(msg))
+
+
+class UpstreamPubClient(object):
+
+    """Implements the message layer client to the upstream Pub API."""
+
+    def __init__(self, address):
+        self.address = address
+        self.zmq_context = zmq.Context()
+        self.socket = self.zmq_context.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.SUBSCRIBE, '')
+        self.socket.connect(address)
+
+    def wait_connected(self):
+        """Creates a monitor socket and wait for the connect event."""
+        monitor = self.socket.get_monitor_socket()
+        while True:
+            msg = zmq.utils.monitor.recv_monitor_message(monitor)
+            logger.debug("monitor message: %r", msg)
+            if int(msg['event']) == zmq.EVENT_CONNECTED:
+                logger.debug("socket connected")
+                break
+        self.socket.disable_monitor()
+
+    def recvmsg(self):
+        """Receives a message and returns it."""
+        frames = self.socket.recv_multipart()
+        logger.debug("received message: %r", frames)
+        assert len(frames) == 1
+        return wire2msg(frames[0])
+
+    def do_recv_callback(self, frames):
+        """Receives a message from zmqstream.on_recv, passing it to a user
+        callback."""
+        logger.info("receiving message: %r", frames)
+        assert len(frames) == 1
+        msg = wire2msg(frames[0])
+        assert self.callback
+        self.callback(msg)
+
+    def setup_recv_callback(self, callback):
+        """Setup a ioloop-backed callback for receiving messages."""
+        self.stream = zmqstream.ZMQStream(self.socket)
+        self.callback = callback
+        self.stream.on_recv(self.do_recv_callback)

@@ -88,7 +88,7 @@ class Daemon(object):
                       }
             pid, container = self.container_manager.create(params)
             container_uuid = container.uuid
-            if len(container.processes.keys()) == 1:
+            if len(container.processes) == 1:
                 if container.power['policy']:
                     container.power['manager'] = PowerPolicyManager(
                             container.resources['cpus'],
@@ -99,37 +99,30 @@ class Daemon(object):
                     p = container.power['profile']
                     p['start'] = self.machine_info['energy']['energy']
                     p['start']['time'] = self.machine_info['time']
-                update = {'api': 'up_rpc_rep',
-                          'type': 'start',
+                update = {'api': 'up_pub',
+                          'type': 'container_start',
                           'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
-                          'pid': pid,
                           'power': container.power['policy'] or dict()
                           }
-                self.upstream_rpc_server.sendmsg(RPC_MSG['start'](**update),
-                                                 client)
-                # setup io callbacks
-                outcb = partial(self.do_children_io, client,
-                                container_uuid, 'stdout')
-                errcb = partial(self.do_children_io, client,
-                                container_uuid, 'stderr')
-                container.processes[pid].stdout.read_until_close(outcb, outcb)
-                container.processes[pid].stderr.read_until_close(errcb, errcb)
-            else:
-                update = {'api': 'up_rpc_rep',
-                          'type': 'process_start',
-                          'container_uuid': container_uuid,
-                          }
-                self.upstream_rpc_server.sendmsg(
-                        RPC_MSG['process_start'](**update), client)
-                # setup io callbacks
-                outcb = partial(self.do_children_io, client,
-                                container_uuid, 'stdout')
-                errcb = partial(self.do_children_io, client,
-                                container_uuid, 'stderr')
-                container.processes[pid].stdout.read_until_close(outcb, outcb)
-                container.processes[pid].stderr.read_until_close(errcb, errcb)
+                self.upstream_pub_server.sendmsg(
+                        PUB_MSG['container_start'](**update))
 
+            # now deal with the process itself
+            update = {'api': 'up_rpc_rep',
+                      'type': 'process_start',
+                      'container_uuid': container_uuid,
+                      'pid': pid,
+                      }
+            self.upstream_rpc_server.sendmsg(
+                RPC_MSG['process_start'](**update), client)
+            # setup io callbacks
+            outcb = partial(self.do_children_io, client, container_uuid,
+                            'stdout')
+            errcb = partial(self.do_children_io, client, container_uuid,
+                            'stderr')
+            container.processes[pid].stdout.read_until_close(outcb, outcb)
+            container.processes[pid].stderr.read_until_close(errcb, errcb)
         elif msg.type == 'kill':
             logger.info("asked to kill container: %r", msg)
             response = self.container_manager.kill(msg.container_uuid)
@@ -161,14 +154,19 @@ class Daemon(object):
     def do_sensor(self):
         self.machine_info = self.sensor_manager.do_update()
         logger.info("current state: %r", self.machine_info)
-        total_power = self.machine_info['energy']['power']['total']
-        msg = {'api': 'up_pub',
-               'type': 'power',
-               'total': total_power,
-               'limit': self.target
-               }
-        self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
-        logger.info("sending sensor message: %r", msg)
+        try:
+            total_power = self.machine_info['energy']['power']['total']
+        except TypeError:
+            logger.error("power sensor format malformed, "
+                         "can not report power upstream.")
+        else:
+            msg = {'api': 'up_pub',
+                   'type': 'power',
+                   'total': total_power,
+                   'limit': self.target
+                   }
+            self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
+            logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
         plan = self.controller.planify(self.target, self.machine_info)
@@ -205,16 +203,30 @@ class Daemon(object):
                 if os.WIFEXITED(status) or os.WIFSIGNALED(status):
                     container = self.container_manager.pids[pid]
                     clientid = container.clientids[pid]
-                    remaining_pids = [p for p in container.processes.keys()
-                                      if p != pid]
+
+                    # first, send a process_exit
                     msg = {'api': 'up_rpc_rep',
+                           'type': 'process_exit',
                            'status': str(status),
                            'container_uuid': container.uuid,
                            }
+                    self.upstream_rpc_server.sendmsg(
+                            RPC_MSG['process_exit'](**msg), clientid)
+                    # Remove the pid of process that is finished
+                    container.processes.pop(pid, None)
+                    self.container_manager.pids.pop(pid, None)
+                    logger.info("Process %s in Container %s has finised.",
+                                pid, container.uuid)
 
-                    if not remaining_pids:
-                        msg['type'] = 'exit'
-                        msg['profile_data'] = dict()
+                    # if this is the last process in the container,
+                    # kill everything
+                    if len(container.processes) == 0:
+                        # deal with container exit
+                        msg = {'api': 'up_pub',
+                               'type': 'container_exit',
+                               'container_uuid': container.uuid,
+                               'profile_data': dict(),
+                               }
                         pp = container.power
                         if pp['policy']:
                             pp['manager'].reset_all()
@@ -233,18 +245,8 @@ class Daemon(object):
                                         container.uuid, diff)
                             msg['profile_data'] = diff
                         self.container_manager.delete(container.uuid)
-                        self.upstream_rpc_server.sendmsg(
-                                RPC_MSG['exit'](**msg), clientid)
-                    else:
-                        msg['type'] = 'process_exit'
-                        # Remove the pid of process that is finished
-                        container.processes.pop(pid, None)
-                        self.container_manager.pids.pop(pid, None)
-                        logger.info("Process %s in Container %s has finised.",
-                                    pid, container.uuid)
-                        self.upstream_rpc_server.sendmsg(
-                                RPC_MSG['process_exit'](**msg), clientid)
-
+                        self.upstream_pub_server.sendmsg(
+                                PUB_MSG['container_exit'](**msg))
             else:
                 logger.debug("child update ignored")
                 pass

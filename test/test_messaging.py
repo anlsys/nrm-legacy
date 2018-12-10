@@ -23,6 +23,12 @@ def upstream_pub_server():
 
 
 @pytest.fixture
+def upstream_pub_client():
+    """Fixture for a server handle on the upstream PUB API"""
+    return nrm.messaging.UpstreamPubClient("ipc:///tmp/nrm-pytest-pub")
+
+
+@pytest.fixture
 def dummy_msg():
     """Fixture for a dummy valid message."""
     d = {'api': 'up_rpc_req', 'type': 'list'}
@@ -73,3 +79,13 @@ def test_rpc_server_callback(upstream_rpc_client, upstream_rpc_server,
 
 def test_pub_server_send(upstream_pub_server, dummy_msg):
     upstream_pub_server.sendmsg(dummy_msg)
+
+
+def test_pub_connection(upstream_pub_client, upstream_pub_server):
+    upstream_pub_client.wait_connected()
+
+
+def test_pub_client_recv(upstream_pub_server, upstream_pub_client, dummy_msg):
+    upstream_pub_server.sendmsg(dummy_msg)
+    msg = upstream_pub_client.recvmsg()
+    assert msg == dummy_msg
