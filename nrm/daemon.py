@@ -154,14 +154,19 @@ class Daemon(object):
     def do_sensor(self):
         self.machine_info = self.sensor_manager.do_update()
         logger.info("current state: %r", self.machine_info)
-        total_power = self.machine_info['energy']['power']['total']
-        msg = {'api': 'up_pub',
-               'type': 'power',
-               'total': total_power,
-               'limit': self.target
-               }
-        self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
-        logger.info("sending sensor message: %r", msg)
+        try:
+            total_power = self.machine_info['energy']['power']['total']
+        except TypeError:
+            logger.error("power sensor format malformed, "
+                         "can not report power upstream.")
+        else:
+            msg = {'api': 'up_pub',
+                   'type': 'power',
+                   'total': total_power,
+                   'limit': self.target
+                   }
+            self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
+            logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
         plan = self.controller.planify(self.target, self.machine_info)
