@@ -46,3 +46,6 @@ venv/
 *.log
 *.nav
 *.out
+
+# frequent clones
+argotest
