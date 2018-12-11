@@ -34,7 +34,12 @@ integration.test:
     - nix-shell -A test --run "./argotk.hs helloworld" --arg nrm-src $BUILD
   artifacts:
     paths:
-    - *.log
+    - cmd_err.log
+    - cmd_out.log
+    - daemon_out.log
+    - daemon_out.log
+    - nrm.log
+    - time.log
     expire_in: 1 week
   except:
     - /^wip\/.*/
