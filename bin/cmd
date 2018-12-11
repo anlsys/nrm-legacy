@@ -26,11 +26,16 @@ class CommandLineInterface(object):
         if uuid:
             logger.info("received signal %d, killing the application..",
                         signum)
-            self.do_kill(KillArgs(uuid))
-            logger.info("killed the application.", signum)
+            command = {'api': 'up_rpc_req',
+                       'type': 'kill',
+                       'container_uuid': uuid
+                       }
+            msg = RPC_MSG['kill'](**command)
+            self.client.sendmsg(msg)
+            logger.info("killed the application, exiting.")
         else:
             logger.info("received signal %d, exiting", signum)
-        exit(1)
+        exit(130)
 
     def setup(self):
         # upstream RPC port
