@@ -36,12 +36,12 @@ integration.test:
     - ls
   artifacts:
     paths:
-    - cmd_err.log
-    - cmd_out.log
-    - daemon_out.log
-    - daemon_out.log
-    - nrm.log
-    - time.log
+      - ./cmd_err.log
+      - ./cmd_out.log
+      - ./daemon_out.log
+      - ./daemon_out.log
+      - ./nrm.log
+      - ./time.log
     expire_in: 1 week
   except:
     - /^wip\/.*/
