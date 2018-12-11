@@ -170,7 +170,7 @@ class ContainerManager(object):
             logger.debug("killing %r:", c)
             for p in c.processes.values():
                 try:
-                    p.terminate()
+                    p.proc.terminate()
                 except OSError:
                     logging.error("OS error: could not terminate process.")
 
