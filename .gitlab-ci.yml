@@ -28,20 +28,17 @@ integration.test:
   stage: test
   script:
     - BUILD=$PWD
-    - cd `mktemp -d`
     - git clone https://xgitlab.cels.anl.gov/argo/argotest.git
     - cd argotest
-    - nix-shell -A test --run "./argotk.hs helloworld" --arg nrm-src $BUILD
-    - pwd
-    - ls
+    - nix-shell -A test --run "./argotk.hs helloworld" --arg nrm-src ../.
   artifacts:
     paths:
-      - ./cmd_err.log
-      - ./cmd_out.log
-      - ./daemon_out.log
-      - ./daemon_out.log
-      - ./nrm.log
-      - ./time.log
+      - argotest/cmd_err.log
+      - argotest/cmd_out.log
+      - argotest/daemon_out.log
+      - argotest/daemon_out.log
+      - argotest/nrm.log
+      - argotest/time.log
     expire_in: 1 week
   except:
     - /^wip\/.*/
