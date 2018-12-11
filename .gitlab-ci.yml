@@ -22,3 +22,18 @@ flake8:
   except:
     - /^wip\/.*/
     - /^WIP\/.*/
+
+
+integration.test:
+  stage: test
+  script:
+    - BUILD=$PWD
+    - cd `mktemp -d`
+    - git clone https://xgitlab.cels.anl.gov/argo/argotest.git
+    - cd argotest
+    - nix-shell -A test --run "./argotk.hs helloworld" --arg nrm-src $BUILD
+  except:
+    - /^wip\/.*/
+    - /^WIP\/.*/
+  tags:
+    - integration
