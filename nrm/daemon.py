@@ -23,8 +23,10 @@ logger = logging.getLogger('nrm')
 
 
 class Daemon(object):
-    def __init__(self):
+
+    def __init__(self, config):
         self.target = 100.0
+        self.config = config
 
     def do_downstream_receive(self, parts):
         logger.info("receiving downstream message: %r", parts)
@@ -293,8 +295,13 @@ class Daemon(object):
         self.downstream_pub = zmqstream.ZMQStream(downstream_pub_socket)
 
         # create managers
-        self.resource_manager = ResourceManager()
-        self.container_manager = ContainerManager(self.resource_manager)
+        self.resource_manager = ResourceManager(hwloc=self.config.hwloc)
+        self.container_manager = ContainerManager(
+           self.resource_manager,
+           perfwrapper=self.config.argo_perf_wrapper,
+           linuxperf=self.config.perf,
+           argo_nodeos_config=self.config.argo_nodeos_config
+           )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
         aa = ApplicationActuator(self.application_manager, self.downstream_pub)
@@ -318,8 +325,14 @@ class Daemon(object):
         ioloop.IOLoop.current().start()
 
 
-def runner():
+def runner(config):
     ioloop.install()
-    logging.basicConfig(level=logging.DEBUG)
-    daemon = Daemon()
+
+    logger.setLevel(logging.DEBUG)
+
+    if config.nrm_log:
+        print("Logging to %s" % config.nrm_log)
+        logger.addHandler(logging.FileHandler(config.nrm_log))
+
+    daemon = Daemon(config)
     daemon.main()

@@ -92,7 +92,8 @@ class PerfWrapper(object):
         logger.info("fifoname: %r", fifoname)
         os.mkfifo(fifoname, 0o600)
 
-        argv = ['perf', 'stat', '-e', 'instructions', '-x', ',',
+        perf_tool_path = os.environ.get('PERF', 'perf')
+        argv = [perf_tool_path, 'stat', '-e', 'instructions', '-x', ',',
                 '-I', str(args.frequency), '-o', fifoname, '--']
         argv.extend(args.cmd)
         logger.info("argv: %r", argv)
