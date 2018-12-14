@@ -62,9 +62,9 @@ class CommandLineInterface(object):
             if argv.uuid:
                 uuid = getattr(msg, 'container_uuid', None)
                 if argv.container == uuid:
-                    logger.info("pub message", msg)
+                    logger.info("pub message: %s", msg)
             else:
-                logger.info("pub message", msg)
+                logger.info("pub message: %s", msg)
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
