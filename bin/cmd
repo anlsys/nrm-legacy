@@ -77,9 +77,18 @@ class CommandLineInterface(object):
         # the command idempotent.
         environ = os.environ
         container_uuid = argv.ucontainername or str(uuid.uuid4())
+
+        # simple check + error msg + non-zero return code
+        def sanitize_manifest(path):
+            if os.path.isfile(path):
+                return(os.path.abspath(path))
+            else:
+                logger.error("Manifest file not found: %s", path)
+                sys.exit(1)
+
         command = {'api': 'up_rpc_req',
                    'type': 'run',
-                   'manifest': argv.manifest,
+                   'manifest': sanitize_manifest(argv.manifest),
                    'path': argv.command,
                    'args': argv.args,
                    'environ': dict(environ),
