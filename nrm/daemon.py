@@ -7,6 +7,7 @@ from powerpolicy import PowerPolicyManager
 from functools import partial
 import json
 import logging
+import time
 import os
 from resources import ResourceManager
 from sensor import SensorManager
@@ -50,10 +51,31 @@ class Daemon(object):
                     app = self.application_manager.applications[uuid]
                     app.update_threads(msg)
             elif event == 'progress':
+                t = time.time()
                 uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    app = self.application_manager.applications[uuid]
-                    app.update_progress(msg)
+                app = self.application_manager.applications[uuid]
+                upstream_msg = {'api': 'up_pub',
+                                'type': 'progress',
+                                'time': t,
+                                'application_uuid': uuid,
+                                'payload': msg['payload']}
+                self.upstream_pub_server.sendmsg(
+                        PUB_MSG['progress'](**upstream_msg))
+                app.update_progress(msg, t)
+            elif event == 'hardwareprogress':
+                t = time.time()
+                app = self.application_manager.applications[msg['app_uuid']]
+                if app.container_uuid == msg['container_uuid']:
+                    app.update_hardwareprogress(msg, t)
+                    upstream_msg = {'api': 'up_pub',
+                                    'type': 'hardwareprogress',
+                                    'time': t,
+                                    'container_uuid': msg['container_uuid'],
+                                    'application_uuid': msg['container_uuid'],
+                                    'payload': msg['payload']}
+                    self.upstream_pub_server.sendmsg(
+                            PUB_MSG['hardwareprogress'](**upstream_msg))
+                    app.update_hardwareprogress(msg, t)
             elif event == 'phase_context':
                 uuid = msg['uuid']
                 if uuid in self.application_manager.applications:

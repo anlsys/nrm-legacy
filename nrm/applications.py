@@ -55,8 +55,12 @@ class Application(object):
             self.do_thread_transition('done')
         self.threads['cur'] = newth
 
-    def update_progress(self, msg):
-        """Update the progress tracking."""
+    def update_progress(self, msg, time):
+        """Update the instrumented progress tracking."""
+        assert self.progress
+
+    def update_hardwareprogress(self, msg, time):
+        """Update the hardware progress tracking."""
         assert self.progress
 
     def update_phase_context(self, msg):

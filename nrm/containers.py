@@ -107,7 +107,10 @@ class ContainerManager(object):
                 manifest_perfwrapper = manifest.app.isolators.perfwrapper
                 if hasattr(manifest_perfwrapper, 'enabled'):
                     if manifest_perfwrapper.enabled in ["1", "True"]:
-                        argv.append(self.perfwrapper)
+                        argv.extend([self.perfwrapper,
+                                     "--perf",
+                                     self.linuxperf,
+                                     "-v"])
 
             if hasattr(manifest.app.isolators, 'power'):
                 if hasattr(manifest.app.isolators.power, 'enabled'):
@@ -127,7 +130,6 @@ class ContainerManager(object):
         # environ['PATH'] = ("/usr/local/sbin:"
         #                   "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         environ['ARGO_CONTAINER_UUID'] = container_name
-        environ['PERF'] = self.linuxperf
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
 

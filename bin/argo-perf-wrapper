@@ -5,6 +5,8 @@ from __future__ import print_function
 import argparse
 import logging
 import zmq
+import zmq.utils
+import zmq.utils.monitor
 import os
 import tempfile
 import subprocess
@@ -30,9 +32,10 @@ class PerfWrapper(object):
 
     def progress_report(self, progress):
         update = {'type': 'application',
-                  'event': 'progress',
+                  'event': 'hardwareprogress',
                   'payload': progress,
-                  'uuid': self.app_uuid,
+                  'app_uuid': self.app_uuid,
+                  'container_uuid': self.container_uuid,
                   }
         self.downstream_pub_socket.send_json(update)
 
@@ -43,6 +46,15 @@ class PerfWrapper(object):
         downstream_pub_param = "ipc:///tmp/nrm-downstream-in"
 
         self.downstream_pub_socket.connect(downstream_pub_param)
+
+        monitor = self.downstream_pub_socket.get_monitor_socket()
+        while True:
+            msg = zmq.utils.monitor.recv_monitor_message(monitor)
+            logger.debug("monitor message: %r", msg)
+            if int(msg['event']) == zmq.EVENT_CONNECTED:
+                logger.debug("downstream pub socket connected")
+                break
+        self.downstream_pub_socket.disable_monitor()
 
         logger.info("downstream pub socket connected to: %s",
                     downstream_pub_param)
@@ -67,18 +79,39 @@ class PerfWrapper(object):
 
     def main(self):
         parser = argparse.ArgumentParser()
-        parser.add_argument("-v", "--verbose",
-                            help="verbose logging information",
-                            action='store_true')
-        parser.add_argument("-f", "--frequency",
-                            help="sampling frequency in ms",
-                            type=int, default=1000)
-        parser.add_argument("cmd", help="command and arguments",
-                            nargs=argparse.REMAINDER)
+        parser.add_argument(
+            '--perf',
+            help="Path to the linux perf tool to use. This path can be"
+                 "relative and makes uses of the $PATH if necessary."
+                 "Override default with the PERF environment"
+                 "variable.",
+            default=os.environ.get('PERF',
+                                   'perf'))
+        parser.add_argument(
+           "--log",
+           help="Main log file. Override default with the NRM_LOG."
+                "environment variable",
+           default=os.environ.get('PERFWRAPPER_LOG',
+                                  '/tmp/nrm_perfwrapper.log'))
+        parser.add_argument(
+            "-v", "--verbose",
+            help="verbose logging information",
+            action='store_true')
+        parser.add_argument(
+            "-f", "--frequency",
+            help="sampling frequency in ms",
+            type=int, default=1000)
+        parser.add_argument(
+            "cmd",
+            help="command and arguments",
+            nargs=argparse.REMAINDER)
         args = parser.parse_args()
 
         if args.verbose:
             logger.setLevel(logging.DEBUG)
+
+        print("Logging to %s" % args.log)
+        logger.addHandler(logging.FileHandler(args.log))
 
         logger.info("cmd: %r", args.cmd)
 
@@ -92,7 +125,7 @@ class PerfWrapper(object):
         logger.info("fifoname: %r", fifoname)
         os.mkfifo(fifoname, 0o600)
 
-        perf_tool_path = os.environ.get('PERF', 'perf')
+        perf_tool_path = args.perf
         argv = [perf_tool_path, 'stat', '-e', 'instructions', '-x', ',',
                 '-I', str(args.frequency), '-o', fifoname, '--']
         argv.extend(args.cmd)
