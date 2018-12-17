@@ -18,7 +18,7 @@ logger = logging.getLogger('nrm')
 # list of APIs supported by this messaging layer. Each message is
 # indexed by its intended api user and the type of the message, along with
 # basic field type information.
-APIS = ['up_rpc_req', 'up_rpc_rep', 'up_pub']
+APIS = ['up_rpc_req', 'up_rpc_rep', 'up_pub', 'down_event']
 MSGFORMATS = {k: {} for k in APIS}
 MSGFORMATS['up_rpc_req'] = {'list': {},
                             'run': {'manifest': basestring,
@@ -47,6 +47,13 @@ MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float},
                         'container_exit': {'container_uuid': basestring,
                                            'profile_data': dict},
                         }
+MSGFORMATS['down_event'] = {'application_start':
+                            {'container_uuid': basestring,
+                             'application_uuid': basestring},
+                            'application_exit':
+                            {'application_uuid': basestring},
+                            'progress': {'payload': int},
+                            }
 
 # Mirror of the message formats, using namedtuples as the actual transport
 # for users of this messaging layer.
@@ -223,3 +230,20 @@ class UpstreamPubClient(object):
         self.stream = zmqstream.ZMQStream(self.socket)
         self.callback = callback
         self.stream.on_recv(self.do_recv_callback)
+
+
+class DownstreamEventServer(UpstreamRPCServer):
+
+    """Implements the message layer server for the downstream event API."""
+
+    def sendmsg(self, msg, client_uuid):
+        assert False, "Cannot send message from this side of the event stream."
+
+
+class DownstreamEventClient(UpstreamRPCClient):
+
+    """Implements the message layer client for the downstream event API."""
+
+    def recvmsg(self):
+        assert False, \
+            "Cannot receive messages from this side of the event stream."
