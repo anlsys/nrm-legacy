@@ -53,6 +53,11 @@ MSGFORMATS['down_event'] = {'application_start':
                             'application_exit':
                             {'application_uuid': basestring},
                             'progress': {'payload': int},
+                            'phase_context': {'cpu': int,
+                                              'startcompute': int,
+                                              'endcompute': int,
+                                              'startbarrier': int,
+                                              'endbarrier': int},
                             }
 
 # Mirror of the message formats, using namedtuples as the actual transport
