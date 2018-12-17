@@ -19,7 +19,8 @@ class ContainerManager(object):
     def __init__(self, rm,
                  perfwrapper="argo-perf-wrapper",
                  linuxperf="perf",
-                 argo_nodeos_config="argo_nodeos_config"):
+                 argo_nodeos_config="argo_nodeos_config",
+                 pmpi_lib="/usr/lib/libnrm-pmpi.so"):
         self.linuxperf = linuxperf
         self.perfwrapper = perfwrapper
         self.nodeos = NodeOSClient(argo_nodeos_config=argo_nodeos_config)
@@ -27,6 +28,7 @@ class ContainerManager(object):
         self.pids = dict()
         self.resourcemanager = rm
         self.chrt = ChrtClient()
+        self.pmpi_lib = pmpi_lib
 
     def create(self, request):
         """Create a container according to the request.
@@ -49,7 +51,7 @@ class ContainerManager(object):
         logger.info("run: ucontainername: %s", ucontainername)
 
         # TODO: Application library to load must be set during configuration
-        apppreloadlibrary = ''
+        apppreloadlibrary = self.pmpi_lib
 
         manifest = ImageManifest()
         if not manifest.load(manifestfile):

@@ -300,7 +300,8 @@ class Daemon(object):
            self.resource_manager,
            perfwrapper=self.config.argo_perf_wrapper,
            linuxperf=self.config.perf,
-           argo_nodeos_config=self.config.argo_nodeos_config
+           argo_nodeos_config=self.config.argo_nodeos_config,
+           pmpi_lib=self.config.pmpi_lib,
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()

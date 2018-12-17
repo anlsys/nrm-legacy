@@ -33,7 +33,9 @@ def main(argv=None):
                 "hwloc": "hwloc",
                 "perf": "perf",
                 "argo_perf_wrapper": "argo-perf-wrapper",
-                "argo_nodeos_config": "argo_nodeos_config"}
+                "argo_nodeos_config": "argo_nodeos_config",
+                "pmpi_lib": "/usr/lib/libnrm-pmpi.so",
+                }
 
     if args.print_defaults:
         print defaults
@@ -74,6 +76,11 @@ def main(argv=None):
                  "variable.",
             default=os.environ.get('PERF',
                                    'perf'))
+    parser.add_argument(
+            '--pmpi_lib',
+            help="Path to the libnrm PMPI library used for the power policy"
+                 "Override default with the PMPI environment variable.",
+            default=os.environ.get('PMPI', defaults['pmpi_lib']))
     parser.add_argument(
             '--argo_perf_wrapper',
             help="Path to the linux perf tool to use. This path can"
