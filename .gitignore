@@ -47,5 +47,5 @@ venv/
 *.nav
 *.out
 
-# frequent clones
-argotest
+# integration tests
+_output
