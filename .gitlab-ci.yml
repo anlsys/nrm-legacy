@@ -23,21 +23,19 @@ flake8:
     - /^wip\/.*/
     - /^WIP\/.*/
 
-
 integration.test:
   stage: test
   script:
-    - git clone https://xgitlab.cels.anl.gov/argo/argotest.git
-    - cd argotest
-    - nix-shell -A test --run "./argotk.hs helloworld" --arg nrm-src ../.
+    - nix-shell .integration.nix --run "argotk.hs helloworld"
   artifacts:
     paths:
-      - argotest/cmd_err.log
-      - argotest/cmd_out.log
-      - argotest/daemon_out.log
-      - argotest/daemon_out.log
-      - argotest/nrm.log
-      - argotest/time.log
+      - _output/cmd_err.log
+      - _output/cmd_out.log
+      - _output/daemon_out.log
+      - _output/daemon_out.log
+      - _output/nrm.log
+      - _output/time.log
+      - _output/.argo_nodeos_config_exit_message
     expire_in: 1 week
   except:
     - /^wip\/.*/
