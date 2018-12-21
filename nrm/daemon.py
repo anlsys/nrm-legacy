@@ -2,19 +2,18 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller, ApplicationActuator, PowerActuator
+from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
-import json
 import logging
 import os
 from resources import ResourceManager
 from sensor import SensorManager
 import signal
-import zmq
-from zmq.eventloop import ioloop, zmqstream
+from zmq.eventloop import ioloop
 from nrm.messaging import MSGTYPES
-from nrm.messaging import UpstreamRPCServer, UpstreamPubServer
+from nrm.messaging import UpstreamRPCServer, UpstreamPubServer, \
+        DownstreamEventServer
 
 RPC_MSG = MSGTYPES['up_rpc_rep']
 PUB_MSG = MSGTYPES['up_pub']
@@ -28,46 +27,31 @@ class Daemon(object):
         self.target = 100.0
         self.config = config
 
-    def do_downstream_receive(self, parts):
-        logger.info("receiving downstream message: %r", parts)
-        if len(parts) != 1:
-            logger.error("unexpected msg length, dropping it: %r", parts)
+    def do_downstream_receive(self, msg, client):
+        logger.info("receiving downstream message: %r", msg)
+        if msg.type == 'application_start':
+            cid = msg.container_uuid
+            container = self.container_manager.containers[cid]
+            self.application_manager.register(msg, container)
+        elif msg.type == 'progress':
+            uuid = msg.container_uuid
+            if uuid in self.application_manager.applications:
+                app = self.application_manager.applications[uuid]
+                app.update_progress(msg)
+        elif msg.type == 'phase_context':
+            uuid = msg.application_uuid
+            if uuid in self.application_manager.applications:
+                app = self.application_manager.applications[uuid]
+                c = self.container_manager.containers[app.cid]
+                if c.power['policy']:
+                    app.update_phase_context(msg)
+        elif msg.type == 'application_exit':
+            uuid = msg.application_uuid
+            if uuid in self.application_manager.applications:
+                self.application_manager.delete(uuid)
+        else:
+            logger.error("unknown msg: %r", msg)
             return
-        msg = json.loads(parts[0])
-        if isinstance(msg, dict):
-            msgtype = msg.get('type')
-            event = msg.get('event')
-            if msgtype is None or msgtype != 'application' or event is None:
-                logger.error("wrong message format: %r", msg)
-                return
-            if event == 'start':
-                cid = msg['container']
-                container = self.container_manager.containers[cid]
-                self.application_manager.register(msg, container)
-            elif event == 'threads':
-                uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    app = self.application_manager.applications[uuid]
-                    app.update_threads(msg)
-            elif event == 'progress':
-                uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    app = self.application_manager.applications[uuid]
-                    app.update_progress(msg)
-            elif event == 'phase_context':
-                uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    app = self.application_manager.applications[uuid]
-                    c = self.container_manager.containers[app.cid]
-                    if c.power['policy']:
-                        app.update_phase_context(msg)
-            elif event == 'exit':
-                uuid = msg['uuid']
-                if uuid in self.application_manager.applications:
-                    self.application_manager.delete(msg['uuid'])
-            else:
-                logger.error("unknown event: %r", event)
-                return
 
     def do_upstream_receive(self, msg, client):
         if msg.type == 'setpower':
@@ -267,32 +251,22 @@ class Daemon(object):
         upstream_rpc_port = 3456
 
         # setup application listening socket
-        context = zmq.Context()
-        downstream_pub_socket = context.socket(zmq.PUB)
-        downstream_sub_socket = context.socket(zmq.SUB)
-        downstream_pub_param = "ipc:///tmp/nrm-downstream-out"
-        downstream_sub_param = "ipc:///tmp/nrm-downstream-in"
+        downstream_event_param = "ipc:///tmp/nrm-downstream-event"
         upstream_pub_param = "tcp://%s:%d" % (bind_address, upstream_pub_port)
         upstream_rpc_param = "tcp://%s:%d" % (bind_address, upstream_rpc_port)
 
-        downstream_pub_socket.bind(downstream_pub_param)
-        downstream_sub_socket.bind(downstream_sub_param)
-        downstream_sub_filter = ""
-        downstream_sub_socket.setsockopt(zmq.SUBSCRIBE, downstream_sub_filter)
+        self.downstream_event = DownstreamEventServer(downstream_event_param)
         self.upstream_pub_server = UpstreamPubServer(upstream_pub_param)
         self.upstream_rpc_server = UpstreamRPCServer(upstream_rpc_param)
 
-        logger.info("downstream pub socket bound to: %s", downstream_pub_param)
-        logger.info("downstream sub socket bound to: %s", downstream_sub_param)
+        logger.info("downstream event socket bound to: %s",
+                    downstream_event_param)
         logger.info("upstream pub socket bound to: %s", upstream_pub_param)
         logger.info("upstream rpc socket connected to: %s", upstream_rpc_param)
 
         # register socket triggers
-        self.downstream_sub = zmqstream.ZMQStream(downstream_sub_socket)
-        self.downstream_sub.on_recv(self.do_downstream_receive)
+        self.downstream_event.setup_recv_callback(self.do_downstream_receive)
         self.upstream_rpc_server.setup_recv_callback(self.do_upstream_receive)
-        # create a stream to let ioloop deal with blocking calls on HWM
-        self.downstream_pub = zmqstream.ZMQStream(downstream_pub_socket)
 
         # create managers
         self.resource_manager = ResourceManager(hwloc=self.config.hwloc)
@@ -300,13 +274,13 @@ class Daemon(object):
            self.resource_manager,
            perfwrapper=self.config.argo_perf_wrapper,
            linuxperf=self.config.perf,
-           argo_nodeos_config=self.config.argo_nodeos_config
+           argo_nodeos_config=self.config.argo_nodeos_config,
+           pmpi_lib=self.config.pmpi_lib,
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        aa = ApplicationActuator(self.application_manager, self.downstream_pub)
         pa = PowerActuator(self.sensor_manager)
-        self.controller = Controller([aa, pa])
+        self.controller = Controller([pa])
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()

@@ -29,6 +29,18 @@ def upstream_pub_client():
 
 
 @pytest.fixture
+def downstream_event_server():
+    """Fixture for a server handle on the downstream event API"""
+    return nrm.messaging.DownstreamEventServer("ipc:///tmp/nrm-pytest-down")
+
+
+@pytest.fixture
+def downstream_event_client():
+    """Fixture for a client handle on the downstream event API"""
+    return nrm.messaging.DownstreamEventClient("ipc:///tmp/nrm-pytest-down")
+
+
+@pytest.fixture
 def dummy_msg():
     """Fixture for a dummy valid message."""
     d = {'api': 'up_rpc_req', 'type': 'list'}
@@ -89,3 +101,26 @@ def test_pub_client_recv(upstream_pub_server, upstream_pub_client, dummy_msg):
     upstream_pub_server.sendmsg(dummy_msg)
     msg = upstream_pub_client.recvmsg()
     assert msg == dummy_msg
+
+
+def test_down_connection(downstream_event_client, downstream_event_server):
+    downstream_event_client.wait_connected()
+
+
+def test_down_event_send_recv(downstream_event_client, downstream_event_server,
+                              dummy_msg):
+    downstream_event_client.sendmsg(dummy_msg)
+    msg, client = downstream_event_server.recvmsg()
+    assert msg == dummy_msg
+    assert client == downstream_event_client.uuid
+
+
+def test_down_event_server_callback(downstream_event_client,
+                                    downstream_event_server,
+                                    dummy_msg, dummy_daemon):
+    downstream_event_server.setup_recv_callback(dummy_daemon.callback)
+    frames = [downstream_event_client.uuid, nrm.messaging.msg2wire(dummy_msg)]
+    downstream_event_server.do_recv_callback(frames)
+    assert dummy_daemon.called
+    assert dummy_daemon.msg == dummy_msg
+    assert dummy_daemon.client == downstream_event_client.uuid

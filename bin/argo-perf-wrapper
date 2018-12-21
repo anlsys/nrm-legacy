@@ -4,12 +4,13 @@ from __future__ import print_function
 
 import argparse
 import logging
-import zmq
 import os
 import tempfile
 import subprocess
 import uuid
+from nrm import messaging
 
+PUB_MSG = messaging.MSGTYPES['down_event']
 logger = logging.getLogger('perf-wrapper')
 
 
@@ -22,30 +23,26 @@ class PerfWrapper(object):
         pass
 
     def shutdown(self):
-        update = {'type': 'application',
-                  'event': 'exit',
-                  'uuid': self.app_uuid,
+        update = {'api': 'down_event',
+                  'type': 'application_exit',
+                  'application_uuid': self.app_uuid,
                   }
-        self.downstream_pub_socket.send_json(update)
+        msg = PUB_MSG['application_exit'](**update)
+        self.downstream_event.sendmsg(msg)
 
     def progress_report(self, progress):
-        update = {'type': 'application',
-                  'event': 'progress',
+        update = {'api': 'down_event',
+                  'type': 'progress',
                   'payload': progress,
-                  'uuid': self.app_uuid,
                   }
-        self.downstream_pub_socket.send_json(update)
+        msg = PUB_MSG['progress'](**update)
+        self.downstream_event.sendmsg(msg)
 
     def setup(self):
-        context = zmq.Context()
-        self.downstream_pub_socket = context.socket(zmq.PUB)
-
-        downstream_pub_param = "ipc:///tmp/nrm-downstream-in"
-
-        self.downstream_pub_socket.connect(downstream_pub_param)
-
-        logger.info("downstream pub socket connected to: %s",
-                    downstream_pub_param)
+        downstream_url = "ipc:///tmp/nrm-downstream-event"
+        self.downstream_event = messaging.DownstreamEventClient(downstream_url)
+        self.downstream_event.wait_connected()
+        logger.info("downstream pub socket connected to: %s", downstream_url)
 
         # retrieve our container uuid
         self.container_uuid = os.environ.get('ARGO_CONTAINER_UUID')
@@ -54,16 +51,14 @@ class PerfWrapper(object):
             exit(1)
         self.app_uuid = str(uuid.uuid4())
         logger.info("client uuid: %r", self.app_uuid)
-
         # send an hello to the demon
-        update = {'type': 'application',
-                  'event': 'start',
-                  'container': self.container_uuid,
-                  'uuid': self.app_uuid,
-                  'progress': True,
-                  'threads': {'min': 1, 'cur': 1, 'max': 1},
+        update = {'api': 'down_event',
+                  'type': 'application_start',
+                  'container_uuid': self.container_uuid,
+                  'application_uuid': self.app_uuid,
                   }
-        self.downstream_pub_socket.send_json(update)
+        msg = PUB_MSG['application_start'](**update)
+        self.downstream_event.sendmsg(msg)
 
     def main(self):
         parser = argparse.ArgumentParser()

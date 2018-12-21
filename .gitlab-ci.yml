@@ -23,7 +23,7 @@ flake8:
     - /^wip\/.*/
     - /^WIP\/.*/
 
-integration.test:
+helloworld.integration.test:
   stage: test
   script:
     - nix-shell .integration.nix --run "argotk.hs helloworld"
@@ -34,7 +34,25 @@ integration.test:
       - _output/daemon_out.log
       - _output/daemon_out.log
       - _output/nrm.log
-      - _output/time.log
+      - _output/.argo_nodeos_config_exit_message
+    expire_in: 1 week
+  except:
+    - /^wip\/.*/
+    - /^WIP\/.*/
+  tags:
+    - integration
+
+perfwrapper.integration.test:
+  stage: test
+  script:
+    - nix-shell .integration.nix --run "argotk.hs perfwrapper"
+  artifacts:
+    paths:
+      - _output/cmd_err.log
+      - _output/cmd_out.log
+      - _output/daemon_out.log
+      - _output/daemon_out.log
+      - _output/nrm.log
       - _output/.argo_nodeos_config_exit_message
     expire_in: 1 week
   except:

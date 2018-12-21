@@ -61,8 +61,8 @@ class Application(object):
 
     def update_phase_context(self, msg):
         """Update the phase contextual information."""
-        id = int(msg['cpu'])
-        self.phase_contexts[id] = {k: int(msg[k]) for k in ('startcompute',
+        id = msg.cpu
+        self.phase_contexts[id] = {k: getattr(msg, k) for k in ('startcompute',
                                    'endcompute', 'startbarrier', 'endbarrier')}
         self.phase_contexts[id]['set'] = True
 
@@ -77,10 +77,10 @@ class ApplicationManager(object):
     def register(self, msg, container):
         """Register a new downstream application."""
 
-        uuid = msg['uuid']
-        container_uuid = msg['container']
-        progress = msg['progress']
-        threads = msg['threads']
+        uuid = msg.application_uuid
+        container_uuid = msg.container_uuid
+        progress = 0
+        threads = False
         phase_contexts = dict()
         phase_context_keys = ['set', 'startcompute', 'endcompute',
                               'startbarrier', 'endbarrier']
