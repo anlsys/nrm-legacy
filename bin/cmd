@@ -61,7 +61,7 @@ class CommandLineInterface(object):
             msg = self.pub_client.recvmsg()
             if argv.uuid:
                 uuid = getattr(msg, 'container_uuid', None)
-                if argv.container == uuid:
+                if argv.uuid == uuid:
                     logger.info("pub message", msg)
             else:
                 logger.info("pub message", msg)
