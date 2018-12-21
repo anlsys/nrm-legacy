@@ -2,7 +2,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager
-from controller import Controller, ApplicationActuator, PowerActuator
+from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
 import logging
@@ -279,9 +279,8 @@ class Daemon(object):
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        aa = ApplicationActuator(self.application_manager, self.downstream_pub)
         pa = PowerActuator(self.sensor_manager)
-        self.controller = Controller([aa, pa])
+        self.controller = Controller([pa])
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()
