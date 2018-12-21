@@ -1,4 +1,5 @@
 stages:
+  - build
   - test
   - style
 
@@ -23,10 +24,31 @@ flake8:
     - /^wip\/.*/
     - /^WIP\/.*/
 
+nrm.build:
+  stage: build
+  script:
+    - nix-build .nix -A nrm
+  tags:
+    - integration
+
+libnrm.build:
+  stage: build
+  script:
+    - nix-build .nix -A libnrm
+  tags:
+    - integration
+
+containers.build:
+  stage: build
+  script:
+    - nix-build .nix -A containers
+  tags:
+    - integration
+
 helloworld.integration.test:
   stage: test
   script:
-    - nix-shell .integration.nix --run "argotk.hs helloworld"
+    - nix-shell .nix -A test --run "argotk.hs helloworld"
   artifacts:
     paths:
       - _output/cmd_err.log
@@ -45,7 +67,7 @@ helloworld.integration.test:
 perfwrapper.integration.test:
   stage: test
   script:
-    - nix-shell .integration.nix --run "argotk.hs perfwrapper"
+    - nix-shell .nix -A test --run "argotk.hs perfwrapper"
   artifacts:
     paths:
       - _output/cmd_err.log

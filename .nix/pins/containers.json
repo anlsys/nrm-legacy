@@ -1,0 +1,14 @@
+{
+  "fetch": {
+    "args": {
+      "fetchSubmodules": false,
+      "rev": "3e8a8ca82e223d0d7f713027fdfd35289e0ef89b",
+      "sha256": "1h2alkay1q7hmw1fq7y37v8fr44dv0r23qnjjdmz1ra3c28b1xq0",
+      "url": "https://xgitlab.cels.anl.gov/argo/containers.git"
+    },
+    "fn": "fetchgit"
+  },
+  "rev": "refs/heads/master",
+  "type": "fetchgit",
+  "url": "https://xgitlab.cels.anl.gov/argo/containers.git"
+}

@@ -1,0 +1,14 @@
+{
+  "fetch": {
+    "args": {
+      "fetchSubmodules": false,
+      "rev": "c81c458de93a353a7b5ba19cd124c02ed8ee85f3",
+      "sha256": "07f9ilxabxfs8iy0l7lq5788lqfrc6ckghdfxxaziiyqav90ayf0",
+      "url": "https://xgitlab.cels.anl.gov/argo/libnrm.git"
+    },
+    "fn": "fetchgit"
+  },
+  "rev": "refs/heads/master",
+  "type": "fetchgit",
+  "url": "https://xgitlab.cels.anl.gov/argo/libnrm.git"
+}

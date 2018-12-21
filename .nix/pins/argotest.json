@@ -1,0 +1,14 @@
+{
+  "fetch": {
+    "args": {
+      "fetchSubmodules": false,
+      "rev": "63c8d3facc1233a46a21c3a64d65da4b637b9587",
+      "sha256": "0h6d95n005jkwq5parzwvl0bw81ii88mgrfaficz4hrlfjknczmi",
+      "url": "https://xgitlab.cels.anl.gov/argo/argotest.git"
+    },
+    "fn": "fetchgit"
+  },
+  "rev": "refs/heads/master",
+  "type": "fetchgit",
+  "url": "https://xgitlab.cels.anl.gov/argo/argotest.git"
+}
