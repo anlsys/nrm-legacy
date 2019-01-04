@@ -41,7 +41,7 @@ class Daemon(object):
             pub = {'api': 'up_pub',
                    'type': 'progress',
                    'payload': msg.payload,
-                   'application_uuid': msg.application_uuid}
+                   'container_uuid': msg.container_uuid}
             self.upstream_pub_server.sendmsg(
                     PUB_MSG['progress'](**pub))
         elif msg.type == 'performance':
