@@ -34,10 +34,27 @@ class Daemon(object):
             container = self.container_manager.containers[cid]
             self.application_manager.register(msg, container)
         elif msg.type == 'progress':
-            uuid = msg.container_uuid
-            if uuid in self.application_manager.applications:
-                app = self.application_manager.applications[uuid]
-                app.update_progress(msg)
+            if msg.application_uuid in self.application_manager.applications:
+                app = self.application_manager.applications[
+                        msg.application_uuid]
+                app.update_performance(msg)
+            pub = {'api': 'up_pub',
+                   'type': 'progress',
+                   'payload': msg.payload,
+                   'application_uuid': msg.application_uuid}
+            self.upstream_pub_server.sendmsg(
+                    PUB_MSG['progress'](**pub))
+        elif msg.type == 'performance':
+            if msg.application_uuid in self.application_manager.applications:
+                app = self.application_manager.applications[
+                        msg.application_uuid]
+                app.update_performance(msg)
+            pub = {'api': 'up_pub',
+                   'type': 'performance',
+                   'payload': msg.payload,
+                   'container_uuid': msg.container_uuid}
+            self.upstream_pub_server.sendmsg(
+                    PUB_MSG['performance'](**pub))
         elif msg.type == 'phase_context':
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
