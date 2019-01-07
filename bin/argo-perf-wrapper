@@ -30,12 +30,14 @@ class PerfWrapper(object):
         msg = PUB_MSG['application_exit'](**update)
         self.downstream_event.sendmsg(msg)
 
-    def progress_report(self, progress):
+    def performance_report(self, performance):
         update = {'api': 'down_event',
-                  'type': 'progress',
-                  'payload': progress,
+                  'type': 'performance',
+                  'payload': performance,
+                  'container_uuid' : self.container_uuid,
+                  'application_uuid' : self.app_uuid,
                   }
-        msg = PUB_MSG['progress'](**update)
+        msg = PUB_MSG['performance'](**update)
         self.downstream_event.sendmsg(msg)
 
     def setup(self):
@@ -123,7 +125,7 @@ class PerfWrapper(object):
             ips = int(instructions / (time - last_time))
 
             logger.info("instructions per second: %r", ips)
-            self.progress_report(ips)
+            self.performance_report(ips)
 
             last_time = time
 

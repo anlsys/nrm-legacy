@@ -1,4 +1,5 @@
 stages:
+  - build
   - test
   - style
 
@@ -13,7 +14,6 @@ py.test:
   tags:
     - rapl
 
-
 flake8:
   stage: style
   script:
@@ -23,10 +23,13 @@ flake8:
     - /^wip\/.*/
     - /^WIP\/.*/
 
-helloworld.integration.test:
+.nix-build:
+  stage: build
+  tags:
+    - integration
+
+.nix-integration:
   stage: test
-  script:
-    - nix-shell .integration.nix --run "argotk.hs helloworld"
   artifacts:
     paths:
       - _output/cmd_err.log
@@ -42,21 +45,44 @@ helloworld.integration.test:
   tags:
     - integration
 
-perfwrapper.integration.test:
-  stage: test
+containers.build:
+  extends: .nix-build
   script:
-    - nix-shell .integration.nix --run "argotk.hs perfwrapper"
-  artifacts:
-    paths:
-      - _output/cmd_err.log
-      - _output/cmd_out.log
-      - _output/daemon_out.log
-      - _output/daemon_out.log
-      - _output/nrm.log
-      - _output/.argo_nodeos_config_exit_message
-    expire_in: 1 week
-  except:
-    - /^wip\/.*/
-    - /^WIP\/.*/
-  tags:
-    - integration
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-build .nix -A containers
+    - rm -rf $CACHE
+
+libnrm.build:
+  extends: .nix-build
+  script:
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-build .nix -A libnrm
+    - rm -rf $CACHE
+
+nrm.build:
+  extends: .nix-build
+  script:
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-build .nix -A nrm
+    - rm -rf $CACHE
+
+TestHello.test:
+  extends: .nix-integration
+  script:
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-shell .nix -A test --run "argotk.hs TestHello"
+    - rm -rf $CACHE
+
+TestListen.test:
+  extends: .nix-integration
+  script:
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-shell .nix -A test --run "argotk.hs TestListen"
+    - rm -rf $CACHE
+
+TestPerfwrapper.test:
+  extends: .nix-integration
+  script:
+    - CACHE=$(mktemp -d --suffix=nixcache /tmp/deletable-nix-cache-XXXX)
+    - XDG_CACHE_HOME=$CACHE nix-shell .nix -A test --run "argotk.hs TestPerfwrapper"
+    - rm -rf $CACHE

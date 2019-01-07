@@ -59,6 +59,9 @@ class Application(object):
         """Update the progress tracking."""
         assert self.progress
 
+    def update_performance(self, msg):
+        """Update the progress tracking."""
+
     def update_phase_context(self, msg):
         """Update the phase contextual information."""
         id = msg.cpu

@@ -61,10 +61,10 @@ class CommandLineInterface(object):
             msg = self.pub_client.recvmsg()
             if argv.uuid:
                 uuid = getattr(msg, 'container_uuid', None)
-                if argv.container == uuid:
-                    logger.info("pub message", msg)
+                if argv.uuid == uuid:
+                    logger.info("pub message: %s", msg)
             else:
-                logger.info("pub message", msg)
+                logger.info("pub message: %s", msg)
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
@@ -118,13 +118,17 @@ class CommandLineInterface(object):
             assert msg.type in ['stdout', 'stderr', 'exit', 'process_exit']
 
             if msg.type == 'stdout':
-                logger.info("container msg: %r", msg)
+                logger.debug("container msg: %r", msg)
                 if msg.payload == 'eof':
                     outeof = True
+                else:
+                    print(msg.payload)
             elif msg.type == 'stderr':
-                logger.info("container msg: %r", msg)
+                logger.debug("container msg: %r", msg)
                 if msg.payload == 'eof':
                     erreof = True
+                else:
+                    print(msg.payload, file=sys.stderr)
             elif msg.type == 'process_exit':
                 logger.info("process ended: %r", msg)
                 state = 'exiting'
