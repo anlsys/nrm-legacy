@@ -40,7 +40,7 @@ MSGFORMATS['up_rpc_rep'] = {'list': {'payload': list},
                                              'status': basestring},
                             'getpower': {'limit': basestring},
                             }
-MSGFORMATS['up_pub'] = {'power': {'total': int, 'limit': float},
+MSGFORMATS['up_pub'] = {'power': {'total': float, 'limit': float},
                         'container_start': {'container_uuid': basestring,
                                             'errno': int,
                                             'power': dict},
