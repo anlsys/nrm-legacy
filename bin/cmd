@@ -8,6 +8,7 @@ import os
 import nrm.messaging
 import uuid
 import sys
+import time
 import collections
 
 RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
@@ -59,12 +60,24 @@ class CommandLineInterface(object):
 
         while(True):
             msg = self.pub_client.recvmsg()
+            logger.debug("pub message: %s", msg)
+
+            def print_if_filter():
+                if argv.filter:
+                    if argv.filter == msg.type:
+                        print("%s, %s, %s" % (msg.type, time.time(),
+                                              msg.payload))
+                        sys.stdout.flush()
+                else:
+                    print("%s, %s" % (msg.type, time.time()))
+                    sys.stdout.flush()
+
             if argv.uuid:
                 uuid = getattr(msg, 'container_uuid', None)
                 if argv.uuid == uuid:
-                    logger.info("pub message: %s", msg)
+                    print_if_filter()
             else:
-                logger.info("pub message: %s", msg)
+                print_if_filter()
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
@@ -226,6 +239,10 @@ class CommandLineInterface(object):
         parser_listen = subparsers.add_parser("listen")
         parser_listen.add_argument("-u", "--uuid",
                                    help="container uuid to listen for",
+                                   default=None)
+        parser_listen.add_argument("-f", "--filter",
+                                   help="type of message to filter and \
+                                        \ prettyprint, in {power,performance}",
                                    default=None)
         parser_listen.set_defaults(func=self.do_listen)
 
