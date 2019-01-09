@@ -74,7 +74,7 @@ class CommandLineInterface(object):
 
             if argv.uuid:
                 uuid = getattr(msg, 'container_uuid', None)
-                if argv.uuid == uuid:
+                if argv.uuid == uuid or msg.type == "power":
                     print_if_filter()
             else:
                 print_if_filter()
