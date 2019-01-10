@@ -20,6 +20,7 @@ class SensorManager:
 
     def __init__(self):
         self.nodeconfig = coolr.clr_nodeinfo.nodeconfig()
+        self.nodename = self.nodeconfig.nodename
         self.cputopology = coolr.clr_nodeinfo.cputopology()
         self.coretemp = coolr.clr_hwmon.coretemp_reader()
         self.rapl = coolr.clr_rapl.rapl_reader()

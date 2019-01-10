@@ -60,9 +60,13 @@ class Daemon(object):
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
                 app = self.application_manager.applications[uuid]
-                c = self.container_manager.containers[app.cid]
-                if c.power['policy']:
-                    app.update_phase_context(msg)
+                if bool(self.container_manager.containers):
+                    cid = app.container_uuid
+                    c = self.container_manager.containers[cid]
+                    if c.power['policy']:
+                        app.update_phase_context(msg)
+                        # Run container policy
+                        self.controller.run_policy_container(c, app)
         elif msg.type == 'application_exit':
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
@@ -107,7 +111,7 @@ class Daemon(object):
                           'type': 'container_start',
                           'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
-                          'power': container.power['policy'] or dict()
+                          'power': container.power['policy'] or str(None)
                           }
                 self.upstream_pub_server.sendmsg(
                         PUB_MSG['container_start'](**update))
@@ -179,8 +183,8 @@ class Daemon(object):
             self.controller.execute(action, actuator)
             self.controller.update(action, actuator)
         # Call policy only if there are containers
-        if self.container_manager.containers:
-            self.controller.run_policy(self.container_manager.containers)
+        # if self.container_manager.containers:
+            # self.controller.run_policy(self.container_manager.containers)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -249,7 +253,7 @@ class Daemon(object):
                             if p['policy']:
                                 diff['damper'] = float(p['damper'])/1000000000
                                 diff['slowdown'] = p['slowdown']
-                            diff['nodename'] = socket.gethostname()
+                            diff['nodename'] = self.sensor_manager.nodename
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff
