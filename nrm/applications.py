@@ -64,9 +64,10 @@ class Application(object):
 
     def update_phase_context(self, msg):
         """Update the phase contextual information."""
-        id = int(msg['cpu'])
-        self.phase_contexts[id] = {k: int(msg[k]) for k in ('aggregation',
-                                   'computetime', 'totaltime')}
+        id = int(msg.cpu)
+        self.phase_contexts[id] = {k: getattr(msg, k) for k in
+                                   ('aggregation', 'computetime',
+                                    'totaltime')}
         self.phase_contexts[id]['set'] = True
 
 

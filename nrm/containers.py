@@ -29,7 +29,6 @@ class ContainerManager(object):
         self.pids = dict()
         self.resourcemanager = rm
         self.hwloc = rm.hwloc
-        self.nodeos = NodeOSClient()
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
 
