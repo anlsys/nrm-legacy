@@ -38,12 +38,12 @@ class Daemon(object):
                 app = self.application_manager.applications[
                         msg.application_uuid]
                 app.update_performance(msg)
-            pub = {'api': 'up_pub',
-                   'type': 'progress',
-                   'payload': msg.payload,
-                   'container_uuid': msg.container_uuid}
-            self.upstream_pub_server.sendmsg(
-                    PUB_MSG['progress'](**pub))
+                pub = {'api': 'up_pub',
+                       'type': 'progress',
+                       'payload': msg.payload,
+                       'application_uuid': msg.application_uuid}
+                self.upstream_pub_server.sendmsg(
+                        PUB_MSG['progress'](**pub))
         elif msg.type == 'performance':
             if msg.application_uuid in self.application_manager.applications:
                 app = self.application_manager.applications[

@@ -65,19 +65,25 @@ class CommandLineInterface(object):
             def print_if_filter():
                 if argv.filter:
                     if argv.filter == msg.type:
-                        print("%s, %s, %s" % (msg.type, time.time(),
-                                              msg.payload))
+                        if (msg.type == "performance" or
+                           msg.type == "progress"):
+                            print("%s, %s, %s" % (msg.type, time.time(),
+                                                  msg.payload))
+                        if msg.type == "power":
+                            print("%s, %s, %s" % (msg.type, time.time(),
+                                                  msg.total))
                         sys.stdout.flush()
                 else:
                     print("%s, %s" % (msg.type, time.time()))
                     sys.stdout.flush()
 
-            if argv.uuid:
-                uuid = getattr(msg, 'container_uuid', None)
-                if argv.uuid == uuid or msg.type == "power":
-                    print_if_filter()
-            else:
-                print_if_filter()
+            print_if_filter()
+            # if argv.uuid:
+            #     uuid = getattr(msg, 'container_uuid', None)
+            #     if argv.uuid == uuid or msg.type == "power":
+            #         print_if_filter()
+            # else:
+            #     print_if_filter()
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
