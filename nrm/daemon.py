@@ -7,7 +7,6 @@ from powerpolicy import PowerPolicyManager
 from functools import partial
 import logging
 import os
-import socket
 from resources import ResourceManager
 from sensor import SensorManager
 import signal
