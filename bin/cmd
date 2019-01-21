@@ -73,6 +73,10 @@ class CommandLineInterface(object):
                             print("%s, %s, %s" % (msg.type, time.time(),
                                                   msg.total))
                         sys.stdout.flush()
+                        if msg.type == "container_exit":
+                            print("%s, %s, %s" % (msg.type, time.time(),
+                                                  msg.profile_data))
+                        sys.stdout.flush()
                 else:
                     print("%s, %s" % (msg.type, time.time()))
                     sys.stdout.flush()
