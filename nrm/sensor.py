@@ -20,6 +20,7 @@ class SensorManager:
 
     def __init__(self):
         self.nodeconfig = coolr.clr_nodeinfo.nodeconfig()
+        self.nodename = self.nodeconfig.nodename
         self.cputopology = coolr.clr_nodeinfo.cputopology()
         self.coretemp = coolr.clr_hwmon.coretemp_reader()
         self.rapl = coolr.clr_rapl.rapl_reader()
@@ -47,8 +48,15 @@ class SensorManager:
 
     def calc_difference(self, start, end):
         diff = dict()
+        for k in start.keys():
+            if k not in ['time']:
+                start[k.replace('p', 'package-')] = start[k]
+                start.pop(k)
+                end[k.replace('p', 'package-')] = end[k]
+                end.pop(k)
+
         # Calculate energy difference
-        diff['energy'] = self.rapl.diffenergy(start, end, shortenFlag=True)
+        diff['energy'] = self.rapl.diffenergy(start, end)
         # Update time elapsed
         diff['time'] = diff['energy']['time']
         # Remove 'time' field returned by function
@@ -58,7 +66,7 @@ class SensorManager:
                           diff['energy']}
 
         # Calculate power difference
-        diff['power'] = self.rapl.calcpower(start, end, shortenFlag=True)
+        diff['power'] = self.rapl.calcpower(start, end)
         # Remove 'delta' field returned by function
         diff['power'].pop('delta')
 

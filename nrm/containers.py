@@ -4,11 +4,12 @@ from aci import ImageManifest
 from collections import namedtuple
 import logging
 from subprograms import ChrtClient, NodeOSClient, resources
-import uuid
+import operator
 
 logger = logging.getLogger('nrm')
 Container = namedtuple('Container', ['uuid', 'manifest', 'resources',
-                                     'power', 'processes', 'clientids'])
+                                     'power', 'processes', 'clientids',
+                                     'hwbindings'])
 
 
 class ContainerManager(object):
@@ -27,6 +28,7 @@ class ContainerManager(object):
         self.containers = dict()
         self.pids = dict()
         self.resourcemanager = rm
+        self.hwloc = rm.hwloc
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
 
@@ -35,20 +37,22 @@ class ContainerManager(object):
 
         Returns the pid of the container or a negative number for errors."""
         container = None
-        container_name = None
         containerexistsflag = False
         processes = None
         clientids = None
+        pp = None
+        hwbindings = None
+        bind_index = 0
 
         manifestfile = request['manifest']
         command = request['file']
         args = request['args']
         environ = request['environ']
-        ucontainername = request['uuid']
+        container_name = request['uuid']
         logger.info("run: manifest file:  %s", manifestfile)
         logger.info("run: command:        %s", command)
         logger.info("run: args:           %r", args)
-        logger.info("run: ucontainername: %s", ucontainername)
+        logger.info("run: container name: %s", container_name)
 
         # TODO: Application library to load must be set during configuration
         apppreloadlibrary = self.pmpi_lib
@@ -64,26 +68,23 @@ class ContainerManager(object):
         else:
             argv = []
 
-        # Check if user-specified container exists else create it
-        if ucontainername in self.containers:
-                container_name = ucontainername
-                container = self.containers[ucontainername]
+        # Check if container exists else create it
+        if container_name in self.containers:
+                container = self.containers[container_name]
                 containerexistsflag = True
                 processes = container.processes
                 clientids = container.clientids
+                hwbindings = container.hwbindings
+                bind_index = len(processes)
         else:
             processes = dict()
             clientids = dict()
-
-            if ucontainername:
-                container_name = ucontainername
-            else:
-                # If no user-specified container name create one
-                container_name = str(uuid.uuid4())
+            hwbindings = dict()
 
             # ask the resource manager for resources
-            req = resources(int(manifest.app.isolators.container.cpus.value),
-                            int(manifest.app.isolators.container.mems.value))
+            ncpus = int(manifest.app.isolators.container.cpus.value)
+            nmems = int(manifest.app.isolators.container.mems.value)
+            req = resources(ncpus, nmems)
             alloc = self.resourcemanager.schedule(container_name, req)
             logger.info("run: allocation: %r", alloc)
 
@@ -123,7 +124,16 @@ class ContainerManager(object):
                                 container_power['policy'] = pp.policy
                                 container_power['damper'] = pp.damper
                                 container_power['slowdown'] = pp.slowdown
-                                environ['LD_PRELOAD'] = apppreloadlibrary
+
+            # Compute hardware bindings
+            if hasattr(manifest.app.isolators, 'hwbind'):
+                manifest_hwbind = manifest.app.isolators.hwbind
+                if hasattr(manifest_hwbind, 'enabled'):
+                    if manifest_hwbind.enabled in ["1", "True"]:
+                        hwbindings['enabled'] = True
+                        hwbindings['distrib'] = sorted(self.hwloc.distrib(
+                                                ncpus, alloc), key=operator.
+                                                attrgetter('cpus'))
 
         # build context to execute
         # environ['PATH'] = ("/usr/local/sbin:"
@@ -132,6 +142,25 @@ class ContainerManager(object):
         environ['PERF'] = self.linuxperf
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
+        if (containerexistsflag and container.power['policy'] is not None) or (
+                pp is not None and pp.policy != "NONE"):
+            environ['LD_PRELOAD'] = apppreloadlibrary
+            environ['NRM_TRANSMIT'] = '1'
+            if containerexistsflag:
+                environ['NRM_DAMPER'] = container.power['damper']
+            else:
+                environ['NRM_DAMPER'] = pp.damper
+
+        # Use hwloc-bind to launch each process in the conatiner by prepending
+        # it as an argument to the command line, if enabled in manifest.
+        # The hardware binding computed using hwloc-distrib is used here
+        # --single
+        if bool(hwbindings) and hwbindings['enabled']:
+            argv.append('hwloc-bind')
+            # argv.append('--single')
+            argv.append('core:'+str(hwbindings['distrib'][bind_index].cpus[0]))
+            argv.append('--membind')
+            argv.append('numa:'+str(hwbindings['distrib'][bind_index].mems[0]))
 
         argv.append(command)
         argv.extend(args)
@@ -149,7 +178,7 @@ class ContainerManager(object):
         else:
             container = Container(container_name, manifest,
                                   container_resources, container_power,
-                                  processes, clientids)
+                                  processes, clientids, hwbindings)
             self.pids[process.pid] = container
             self.containers[container_name] = container
             logger.info("Container %s created and running : %r",

@@ -7,6 +7,7 @@ from powerpolicy import PowerPolicyManager
 from functools import partial
 import logging
 import os
+import socket
 from resources import ResourceManager
 from sensor import SensorManager
 import signal
@@ -59,9 +60,13 @@ class Daemon(object):
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
                 app = self.application_manager.applications[uuid]
-                c = self.container_manager.containers[app.cid]
-                if c.power['policy']:
-                    app.update_phase_context(msg)
+                if bool(self.container_manager.containers):
+                    cid = app.container_uuid
+                    c = self.container_manager.containers[cid]
+                    if c.power['policy']:
+                        app.update_phase_context(msg)
+                        # Run container policy
+                        self.controller.run_policy_container(c, app)
         elif msg.type == 'application_exit':
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
@@ -106,7 +111,7 @@ class Daemon(object):
                           'type': 'container_start',
                           'container_uuid': container_uuid,
                           'errno': 0 if container else -1,
-                          'power': container.power['policy'] or dict()
+                          'power': container.power['policy'] or str(None)
                           }
                 self.upstream_pub_server.sendmsg(
                         PUB_MSG['container_start'](**update))
@@ -178,8 +183,8 @@ class Daemon(object):
             self.controller.execute(action, actuator)
             self.controller.update(action, actuator)
         # Call policy only if there are containers
-        if self.container_manager.containers:
-            self.controller.run_policy(self.container_manager.containers)
+        # if self.container_manager.containers:
+            # self.controller.run_policy(self.container_manager.containers)
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -230,20 +235,25 @@ class Daemon(object):
                                'container_uuid': container.uuid,
                                'profile_data': dict(),
                                }
-                        pp = container.power
-                        if pp['policy']:
-                            pp['manager'].reset_all()
-                        if pp['profile']:
-                            e = pp['profile']['end']
+                        p = container.power
+                        if p['policy']:
+                            p['manager'].reset_all()
+                        if p['profile']:
+                            e = p['profile']['end']
                             self.machine_info = self.sensor_manager.do_update()
                             e = self.machine_info['energy']['energy']
                             e['time'] = self.machine_info['time']
-                            s = pp['profile']['start']
+                            s = p['profile']['start']
                             # Calculate difference between the values
                             diff = self.sensor_manager.calc_difference(s, e)
                             # Get final package temperature
                             temp = self.machine_info['temperature']
                             diff['temp'] = map(lambda k: temp[k]['pkg'], temp)
+                            diff['policy'] = p['policy']
+                            if p['policy']:
+                                diff['damper'] = float(p['damper'])/1000000000
+                                diff['slowdown'] = p['slowdown']
+                            diff['nodename'] = self.sensor_manager.nodename
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
                             msg['profile_data'] = diff

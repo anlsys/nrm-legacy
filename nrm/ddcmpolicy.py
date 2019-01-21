@@ -24,6 +24,7 @@
     p. 3. ACM, 2015.
 """
 
+from __future__ import division
 import math
 import coolr
 import coolr.dutycycle
@@ -43,11 +44,14 @@ class DDCMPolicy:
         self.dc = coolr.dutycycle.DutyCycle()
 
     def print_stats(self, resetflag=False):
-        print('DDCM Policy: DDCMPolicySets %d DDCMPolicyResets %d' %
-              (self.ddcmpolicyset, self.ddcmpolicyreset))
+        ddcmstats = dict()
+        ddcmstats['DDCMPolicySets'] = self.ddcmpolicyset
+        ddcmstats['DDCMPolicyResets'] = self.ddcmpolicyreset
         if resetflag:
             self.ddcmpolicyset = 0
             self.ddcmpolicyreset = 0
+
+        return ddcmstats
 
     def execute(self, cpu, currentdclevel, computetime, totalphasetime):
         # Compute work done by cpu during current phase
@@ -79,10 +83,6 @@ class DDCMPolicy:
                 # If reduction required is 0
                 newdclevel = currentdclevel
 
-            # Check if new dc level computed is not less than whats permissible
-            if newdclevel < self.mindclevel:
-                newdclevel = self.maxdclevel
-
         # If there was a slowdown in the last phase, then increase the duty
         # cycle level corresponding to the slowdown
         else:
@@ -93,11 +93,10 @@ class DDCMPolicy:
 
             newdclevel = currentdclevel + dcincrease
 
-            # Check if new dc level computed is not greater than whats
-            # permissible
-            if newdclevel > self.maxdclevel:
-                newdclevel = self.maxdclevel
-
+        # Check if new dc level computed is within permissible range, else
+        # reset
+        if newdclevel < self.mindclevel or newdclevel > self.maxdclevel:
+            newdclevel = self.maxdclevel
         # Set the duty cycle of cpu to the new value computed
         self.dc.set(cpu, newdclevel)
 

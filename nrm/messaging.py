@@ -43,7 +43,7 @@ MSGFORMATS['up_rpc_rep'] = {'list': {'payload': list},
 MSGFORMATS['up_pub'] = {'power': {'total': float, 'limit': float},
                         'container_start': {'container_uuid': basestring,
                                             'errno': int,
-                                            'power': dict},
+                                            'power': basestring},
                         'container_exit': {'container_uuid': basestring,
                                            'profile_data': dict},
                         'performance': {'container_uuid': basestring,
@@ -63,10 +63,10 @@ MSGFORMATS['down_event'] = {'application_start':
                                          'application_uuid': basestring,
                                          'container_uuid': basestring},
                             'phase_context': {'cpu': int,
-                                              'startcompute': int,
-                                              'endcompute': int,
-                                              'startbarrier': int,
-                                              'endbarrier': int},
+                                              'aggregation': int,
+                                              'computetime': int,
+                                              'totaltime': int,
+                                              'application_uuid': basestring},
                             }
 
 # Mirror of the message formats, using namedtuples as the actual transport

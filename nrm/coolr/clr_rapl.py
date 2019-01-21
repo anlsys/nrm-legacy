@@ -142,12 +142,10 @@ class rapl_reader:
             ret[k] = dvals
         return ret
 
-    def diffenergy(self,e1,e2,shortenFlag=False): # e1 is prev and e2 is not
+    def diffenergy(self,e1,e2): # e1 is prev and e2 is not
         ret = {}
         ret['time'] = e2['time'] - e1['time']
         for k in self.max_energy_range_uj_d:
-            if shortenFlag:
-                k = self.shortenkey(k)
             if e2[k]>=e1[k]:
                 ret[k] = e2[k] - e1[k]
             else:
@@ -157,7 +155,7 @@ class rapl_reader:
     # calculate the average power from two energy values
     # e1 and e2 are the value returned from readenergy()
     # e1 should be sampled before e2
-    def calcpower(self,e1,e2,shortenFlag=False): 
+    def calcpower(self,e1,e2): 
         ret = {}
         delta = e2['time'] - e1['time']  # assume 'time' never wrap around
         ret['delta']  = delta
@@ -168,8 +166,6 @@ class rapl_reader:
             return ret
 
         for k in self.max_energy_range_uj_d:
-            if shortenFlag:
-                k = self.shortenkey(k)
             if e2[k]>=e1[k]:
                 ret[k] = e2[k] - e1[k]
             else:
