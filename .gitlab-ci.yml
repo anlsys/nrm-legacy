@@ -10,9 +10,6 @@ py.test:
   script:
     - pipenv install --dev
     - pipenv run py.test
-  except:
-    - /^wip\/.*/
-    - /^WIP\/.*/
   tags:
     - rapl
 
@@ -21,6 +18,3 @@ flake8:
   script:
     - pipenv install --dev
     - pipenv run flake8
-  except:
-    - /^wip\/.*/
-    - /^WIP\/.*/
