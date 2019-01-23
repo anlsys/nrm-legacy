@@ -20,54 +20,99 @@ logger = logging.getLogger('nrm')
 # basic field type information.
 APIS = ['up_rpc_req', 'up_rpc_rep', 'up_pub', 'down_event']
 MSGFORMATS = {k: {} for k in APIS}
-MSGFORMATS['up_rpc_req'] = {'list': {},
-                            'run': {'manifest': basestring,
-                                    'path': basestring,
-                                    'args': list,
-                                    'container_uuid': basestring,
-                                    'environ': dict},
-                            'kill': {'container_uuid': basestring},
-                            'setpower': {'limit': basestring},
-                            }
-MSGFORMATS['up_rpc_rep'] = {'list': {'payload': list},
-                            'stdout': {'container_uuid': basestring,
-                                       'payload': basestring},
-                            'stderr': {'container_uuid': basestring,
-                                       'payload': basestring},
-                            'process_start': {'container_uuid': basestring,
-                                              'pid': int},
-                            'process_exit': {'container_uuid': basestring,
-                                             'status': basestring},
-                            'getpower': {'limit': basestring},
-                            }
-MSGFORMATS['up_pub'] = {'power': {'total': float, 'limit': float},
-                        'container_start': {'container_uuid': basestring,
-                                            'errno': int,
-                                            'power': basestring},
-                        'container_exit': {'container_uuid': basestring,
-                                           'profile_data': dict},
-                        'performance': {'container_uuid': basestring,
-                                        'payload': int},
-                        'progress': {'application_uuid': basestring,
-                                     'payload': int},
-                        }
-MSGFORMATS['down_event'] = {'application_start':
-                            {'container_uuid': basestring,
-                             'application_uuid': basestring},
-                            'application_exit':
-                            {'application_uuid': basestring},
-                            'performance': {'payload': int,
-                                            'application_uuid': basestring,
-                                            'container_uuid': basestring},
-                            'progress': {'payload': int,
-                                         'application_uuid': basestring,
-                                         'container_uuid': basestring},
-                            'phase_context': {'cpu': int,
-                                              'aggregation': int,
-                                              'computetime': int,
-                                              'totaltime': int,
-                                              'application_uuid': basestring},
-                            }
+
+MSGFORMATS['up_rpc_req'] = {
+        'list':                 {},
+        'run':                  {
+            'manifest':         basestring,
+            'path':             basestring,
+            'args':             list,
+            'container_uuid':   basestring,
+            'environ':          dict
+            },
+        'kill':                 {
+            'container_uuid':   basestring
+            },
+        'setpower':             {
+            'limit':            basestring
+            }
+        }
+
+MSGFORMATS['up_rpc_rep'] = {
+        'list':                 {
+            'payload':          list
+            },
+        'stdout':               {
+            'container_uuid':   basestring,
+            'payload':          basestring
+            },
+        'stderr':               {
+            'container_uuid':   basestring,
+            'payload':          basestring
+            },
+        'process_start':        {
+            'container_uuid':   basestring,
+            'pid':              int
+            },
+        'process_exit':         {
+            'container_uuid':   basestring,
+            'status':           basestring
+            },
+        'getpower':             {
+            'limit':            basestring
+            }
+        }
+
+MSGFORMATS['up_pub'] = {
+        'power':                {
+            'total':            float,
+            'limit':            float
+            },
+        'container_start':      {
+            'container_uuid':   basestring,
+            'errno':            int,
+            'power':            dict
+            },
+        'container_exit':       {
+            'container_uuid':   basestring,
+            'profile_data':     dict
+            },
+        'performance':          {
+            'container_uuid':   basestring,
+            'payload':          int
+            },
+        'progress':             {
+            'application_uuid': basestring,
+            'payload':          int
+            }
+        }
+
+MSGFORMATS['down_event'] = {
+        'application_start':    {
+            'container_uuid':   basestring,
+            'application_uuid': basestring
+            },
+        'application_exit':     {
+            'application_uuid': basestring
+            },
+        'performance':          {
+            'container_uuid':   basestring,
+            'application_uuid': basestring,
+            'payload':          int,
+            },
+        'progress':             {
+            'application_uuid': basestring,
+            'container_uuid':   basestring,
+            'payload':          int
+            },
+        'phase_context':        {
+            'cpu':              int,
+            'startcompute':     int,
+            'endcompute':       int,
+            'startbarrier':     int,
+            'endbarrier':       int
+            }
+        }
 
 # Mirror of the message formats, using namedtuples as the actual transport
 # for users of this messaging layer.
