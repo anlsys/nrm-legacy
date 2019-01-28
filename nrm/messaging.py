@@ -71,7 +71,7 @@ MSGFORMATS['up_pub'] = {
         'container_start':      {
             'container_uuid':   basestring,
             'errno':            int,
-            'power':            dict
+            'power':            basestring
             },
         'container_exit':       {
             'container_uuid':   basestring,
@@ -102,7 +102,6 @@ MSGFORMATS['down_event'] = {
             },
         'progress':             {
             'application_uuid': basestring,
-            'container_uuid':   basestring,
             'payload':          int
             },
         'phase_context':        {
