@@ -70,12 +70,12 @@ class ContainerManager(object):
 
         # Check if container exists else create it
         if container_name in self.containers:
-                container = self.containers[container_name]
-                containerexistsflag = True
-                processes = container.processes
-                clientids = container.clientids
-                hwbindings = container.hwbindings
-                bind_index = len(processes)
+            container = self.containers[container_name]
+            containerexistsflag = True
+            processes = container.processes
+            clientids = container.clientids
+            hwbindings = container.hwbindings
+            bind_index = len(processes)
         else:
             processes = dict()
             clientids = dict()
@@ -114,16 +114,16 @@ class ContainerManager(object):
 
             if hasattr(manifest.app.isolators, 'power'):
                 if hasattr(manifest.app.isolators.power, 'enabled'):
-                        pp = manifest.app.isolators.power
-                        if pp.enabled in ["1", "True"]:
-                            if pp.profile in ["1", "True"]:
-                                container_power['profile'] = dict()
-                                container_power['profile']['start'] = dict()
-                                container_power['profile']['end'] = dict()
-                            if pp.policy != "NONE":
-                                container_power['policy'] = pp.policy
-                                container_power['damper'] = pp.damper
-                                container_power['slowdown'] = pp.slowdown
+                    pp = manifest.app.isolators.power
+                    if pp.enabled in ["1", "True"]:
+                        if pp.profile in ["1", "True"]:
+                            container_power['profile'] = dict()
+                            container_power['profile']['start'] = dict()
+                            container_power['profile']['end'] = dict()
+                        if pp.policy != "NONE":
+                            container_power['policy'] = pp.policy
+                            container_power['damper'] = pp.damper
+                            container_power['slowdown'] = pp.slowdown
 
             # Compute hardware bindings
             if hasattr(manifest.app.isolators, 'hwbind'):
