@@ -1,4 +1,4 @@
-include: 'https://xgitlab.cels.anl.gov/argo/argotest/raw/master/gitlab/basic.yml'
+include: 'https://xgitlab.cels.anl.gov/argo/argotest/raw/master/gitlab/refactored.yml'
 
 stages:
   - build
