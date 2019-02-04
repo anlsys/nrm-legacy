@@ -62,7 +62,7 @@ class ContainerManager(object):
             logger.error("Manifest is invalid")
             return None
 
-        if hasattr(manifest.app.isolators, 'scheduler'):
+        if manifest.is_feature_enabled('scheduler'):
             sched = manifest.app.isolators.scheduler
             argv = self.chrt.getwrappedcmd(sched)
         else:
@@ -106,33 +106,25 @@ class ContainerManager(object):
             # argo-nodeos-config and not the final command -- that way it would
             # be running outside of the container.  However, because
             # argo-nodeos-config is suid root, perf can't monitor it.
-            if hasattr(manifest.app.isolators, 'perfwrapper'):
-                manifest_perfwrapper = manifest.app.isolators.perfwrapper
-                if hasattr(manifest_perfwrapper, 'enabled'):
-                    if manifest_perfwrapper.enabled in ["1", "True"]:
-                        argv.append(self.perfwrapper)
+            if manifest.is_feature_enabled('perfwrapper'):
+                argv.append(self.perfwrapper)
 
-            if hasattr(manifest.app.isolators, 'power'):
-                if hasattr(manifest.app.isolators.power, 'enabled'):
-                    pp = manifest.app.isolators.power
-                    if pp.enabled in ["1", "True"]:
-                        if pp.profile in ["1", "True"]:
-                            container_power['profile'] = dict()
-                            container_power['profile']['start'] = dict()
-                            container_power['profile']['end'] = dict()
-                        if pp.policy != "NONE":
-                            container_power['policy'] = pp.policy
-                            container_power['damper'] = pp.damper
-                            container_power['slowdown'] = pp.slowdown
+            if manifest.is_feature_enabled('power'):
+                pp = manifest.app.isolators.power
+                if pp.profile in ["1", "True"]:
+                    container_power['profile'] = dict()
+                    container_power['profile']['start'] = dict()
+                    container_power['profile']['end'] = dict()
+                if pp.policy != "NONE":
+                    container_power['policy'] = pp.policy
+                    container_power['damper'] = pp.damper
+                    container_power['slowdown'] = pp.slowdown
 
             # Compute hardware bindings
-            if hasattr(manifest.app.isolators, 'hwbind'):
-                manifest_hwbind = manifest.app.isolators.hwbind
-                if hasattr(manifest_hwbind, 'enabled'):
-                    if manifest_hwbind.enabled in ["1", "True"]:
-                        hwbindings['enabled'] = True
-                        hwbindings['distrib'] = sorted(self.hwloc.distrib(
-                                                ncpus, alloc), key=operator.
+            if manifest.is_feature_enabled('hwbind'):
+                hwbindings['enabled'] = True
+                hwbindings['distrib'] = sorted(self.hwloc.distrib(
+                                            ncpus, alloc), key=operator.
                                                 attrgetter('cpus'))
 
         # build context to execute

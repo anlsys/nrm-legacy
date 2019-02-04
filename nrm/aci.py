@@ -58,6 +58,7 @@ class Scheduler(SpecField):
 
     fields = {"policy": spec(unicode, True),
               "priority": spec(unicode, False),
+              "enabled": spec(unicode, False),
               }
 
     def __init__(self):
@@ -78,6 +79,10 @@ class Scheduler(SpecField):
             logger.warning("scheduler priority forced as 0 " +
                            "for non default policies")
             self.priority = "0"
+        if getattr(self, "enabled", "1") not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value for scheduler enabled: %s",
+                         self.enabled)
+            return False
         return True
 
 
@@ -142,7 +147,7 @@ class PerfWrapper(SpecField):
         ret = super(PerfWrapper, self).load(data)
         if not ret:
             return ret
-        if self.enabled not in ["0", "False", "1", "True"]:
+        if getattr(self, "enabled", "1") not in ["0", "False", "1", "True"]:
             logger.error("Invalid value for perfwrapper enabled: %s",
                          self.enabled)
             return False
@@ -294,3 +299,23 @@ class ImageManifest(SpecField):
         with open(filename, 'r') as f:
             data = json.load(f)
         return super(ImageManifest, self).load(data)
+
+    def load_dict(self, data):
+        """Load a manifest in dictionary form."""
+        return super(ImageManifest, self).load(data)
+
+    def is_feature_enabled(self, feature, true_values=["1", "True"]):
+        """Check if a specific feature is enabled.
+
+        Since the enabled field itself is optional, we return true if an
+        isolator is present in a manifest or the enabled field is not true."""
+        typename = "argo/{}".format(feature)
+        assert typename in IsolatorList.types, \
+            "{} in not a valid feature".format(feature)
+        logger.debug(repr(self))
+        if hasattr(self.app.isolators, feature):
+            isolator = getattr(self.app.isolators, feature)
+            if hasattr(isolator, 'enabled'):
+                if isolator.enabled not in true_values:
+                    return False
+        return True
