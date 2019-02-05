@@ -102,13 +102,6 @@ class ContainerManager(object):
             container_power['slowdown'] = None
             container_power['manager'] = None
 
-            # It would've been better if argo-perf-wrapper wrapped around
-            # argo-nodeos-config and not the final command -- that way it would
-            # be running outside of the container.  However, because
-            # argo-nodeos-config is suid root, perf can't monitor it.
-            if manifest.is_feature_enabled('perfwrapper'):
-                argv.append(self.perfwrapper)
-
             if manifest.is_feature_enabled('power'):
                 pp = manifest.app.isolators.power
                 if pp.profile in ["1", "True"]:
@@ -142,6 +135,13 @@ class ContainerManager(object):
                 environ['NRM_DAMPER'] = container.power['damper']
             else:
                 environ['NRM_DAMPER'] = pp.damper
+
+        # It would've been better if argo-perf-wrapper wrapped around
+        # argo-nodeos-config and not the final command -- that way it would
+        # be running outside of the container.  However, because
+        # argo-nodeos-config is suid root, perf can't monitor it.
+        if manifest.is_feature_enabled('perfwrapper'):
+            argv.append(self.perfwrapper)
 
         # Use hwloc-bind to launch each process in the conatiner by prepending
         # it as an argument to the command line, if enabled in manifest.
