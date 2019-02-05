@@ -61,12 +61,6 @@ class ContainerManager(object):
             logger.error("Manifest is invalid")
             return None
 
-        if manifest.is_feature_enabled('scheduler'):
-            sched = manifest.app.isolators.scheduler
-            argv = self.chrt.getwrappedcmd(sched)
-        else:
-            argv = []
-
         # Check if container exists else create it
         if container_name in self.containers:
             container = self.containers[container_name]
@@ -135,12 +129,11 @@ class ContainerManager(object):
             else:
                 environ['NRM_DAMPER'] = pp.damper
 
-        # It would've been better if argo-perf-wrapper wrapped around
-        # argo-nodeos-config and not the final command -- that way it would
-        # be running outside of the container.  However, because
-        # argo-nodeos-config is suid root, perf can't monitor it.
-        if manifest.is_feature_enabled('perfwrapper'):
-            argv.append(self.perfwrapper)
+        # build prefix to the entire command based on enabled features
+        argv = []
+        if manifest.is_feature_enabled('scheduler'):
+            sched = manifest.app.isolators.scheduler
+            argv = self.chrt.getwrappedcmd(sched)
 
         # Use hwloc-bind to launch each process in the conatiner by prepending
         # it as an argument to the command line, if enabled in manifest.
@@ -152,6 +145,13 @@ class ContainerManager(object):
             argv.append('core:'+str(hwbindings['distrib'][bind_index].cpus[0]))
             argv.append('--membind')
             argv.append('numa:'+str(hwbindings['distrib'][bind_index].mems[0]))
+
+        # It would've been better if argo-perf-wrapper wrapped around
+        # argo-nodeos-config and not the final command -- that way it would
+        # be running outside of the container.  However, because
+        # argo-nodeos-config is suid root, perf can't monitor it.
+        if manifest.is_feature_enabled('perfwrapper'):
+            argv.append(self.perfwrapper)
 
         argv.append(command)
         argv.extend(args)
