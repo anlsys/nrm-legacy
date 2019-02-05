@@ -49,12 +49,11 @@ class ContainerManager(object):
         args = request['args']
         environ = request['environ']
         container_name = request['uuid']
-        logger.info("run: manifest file:  %s", manifestfile)
-        logger.info("run: command:        %s", command)
-        logger.info("run: args:           %r", args)
-        logger.info("run: container name: %s", container_name)
+        logger.info("create: manifest file:  %s", manifestfile)
+        logger.info("create: command:        %s", command)
+        logger.info("create: args:           %r", args)
+        logger.info("create: container name: %s", container_name)
 
-        # TODO: Application library to load must be set during configuration
         apppreloadlibrary = self.pmpi_lib
 
         manifest = ImageManifest()
