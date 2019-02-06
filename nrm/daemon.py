@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 from applications import ApplicationManager
-from containers import ContainerManager
+from containers import ContainerManager, NodeOSContainerRuntime
 from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
@@ -296,12 +296,15 @@ class Daemon(object):
 
         # create managers
         self.resource_manager = ResourceManager(hwloc=self.config.hwloc)
+        container_runtime = \
+            NodeOSContainerRuntime(self.config.argo_nodeos_config)
         self.container_manager = ContainerManager(
-           self.resource_manager,
-           perfwrapper=self.config.argo_perf_wrapper,
-           linuxperf=self.config.perf,
-           argo_nodeos_config=self.config.argo_nodeos_config,
-           pmpi_lib=self.config.pmpi_lib,
+                container_runtime,
+                self.resource_manager,
+                perfwrapper=self.config.argo_perf_wrapper,
+                linuxperf=self.config.perf,
+                argo_nodeos_config=self.config.argo_nodeos_config,
+                pmpi_lib=self.config.pmpi_lib,
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()

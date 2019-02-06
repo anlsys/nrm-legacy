@@ -17,14 +17,13 @@ class ContainerManager(object):
     """Manages the creation, listing and deletion of containers, using a
     container runtime underneath."""
 
-    def __init__(self, rm,
+    def __init__(self, container_runtime, rm,
                  perfwrapper="argo-perf-wrapper",
                  linuxperf="perf",
-                 argo_nodeos_config="argo_nodeos_config",
                  pmpi_lib="/usr/lib/libnrm-pmpi.so"):
         self.linuxperf = linuxperf
         self.perfwrapper = perfwrapper
-        self.nodeos = NodeOSClient(argo_nodeos_config=argo_nodeos_config)
+        self.runtime = container_runtime
         self.containers = dict()
         self.pids = dict()
         self.resourcemanager = rm
@@ -101,7 +100,7 @@ class ContainerManager(object):
                                                                manifest)
         if creation_needed:
             logger.info("Creating container %s", container_name)
-            self.nodeos.create(container_name, container.resources)
+            self.runtime.create(container)
             self.containers[container_name] = container
 
         # build context to execute
@@ -153,7 +152,7 @@ class ContainerManager(object):
         argv.extend(args)
 
         # run my command
-        process = self.nodeos.execute(container_name, argv, environ)
+        process = self.runtime.execute(container_name, argv, environ)
 
         # register the process
         container.processes[process.pid] = process
@@ -165,7 +164,7 @@ class ContainerManager(object):
 
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
-        self.nodeos.delete(uuid, kill=True)
+        self.runtime.delete(uuid, kill=True)
         self.resourcemanager.update(uuid)
         c = self.containers[uuid]
         del self.containers[uuid]
@@ -186,3 +185,51 @@ class ContainerManager(object):
         """List the containers in the system."""
         return [{'uuid': c.uuid, 'pid': c.processes.keys()}
                 for c in self.containers.values()]
+
+
+class ContainerRuntime(object):
+
+    """Implements the creation, deleting and spawning of commands for a
+    container runtime."""
+
+    def __init__(self):
+        pass
+
+    def create(self, container):
+        """Create the container defined by the container namedtuple on the
+        system."""
+        raise NotImplementedError
+
+    def execute(self, container_uuid, args, environ):
+        """Execute a command inside a container, using a similar interface to
+        popen.
+
+        Returns a tornado.process.Subprocess"""
+        raise NotImplementedError
+
+    def delete(self, container_uuid, kill=False):
+        """Delete a container, possibly killing all the processes inside."""
+        raise NotImplementedError
+
+
+class NodeOSRuntime(ContainerRuntime):
+
+    """Implements the container runtime interface using the nodeos
+    subprogram."""
+
+    def __init__(self, path="argo_nodeos_config"):
+        """Creates the client for nodeos, with an optional custom
+        path/command."""
+        self.client = NodeOSClient(argo_nodeos_config=path)
+
+    def create(self, container):
+        """Uses the container resource allocation to create a container."""
+        self.client.create(container.uuid, container.resources)
+
+    def execute(self, container_uuid, args, environ):
+        """Launches a command in the container."""
+        return self.client.execute(container_uuid, args, environ)
+
+    def delete(self, container_uuid, kill=False):
+        """Delete the container."""
+        self.client.delete(container_uuid, kill)
