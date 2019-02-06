@@ -137,6 +137,7 @@ class ContainerManager(object):
             # argv.append('--single')
             cpumask = container.hwbindings['distrib'][bind_index].cpus[0]
             memmask = container.hwbindings['distrib'][bind_index].mems[0]
+            logging.info('create: binding to: %s, %s', cpumask, memmask)
             argv.append("core:{}".format(cpumask))
             argv.append('--membind')
             argv.append("numa:{}".format(memmask))
