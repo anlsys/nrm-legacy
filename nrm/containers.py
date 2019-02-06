@@ -233,3 +233,25 @@ class NodeOSRuntime(ContainerRuntime):
     def delete(self, container_uuid, kill=False):
         """Delete the container."""
         self.client.delete(container_uuid, kill)
+
+
+class DummyRuntime(ContainerRuntime):
+
+    """Implements a dummy runtime that doesn't create any container, but still
+    launches commands."""
+
+    def __init__(self):
+        pass
+
+    def create(self, container):
+        pass
+
+    def execute(self, container_uuid, args, environ):
+        import tornado.process as process
+        return process.Subprocess(args, stdin=process.Subprocess.STREAM,
+                                  stdout=process.Subprocess.STREAM,
+                                  stderr=process.Subprocess.STREAM,
+                                  env=environ)
+
+    def delete(self, container_uuid, kill=False):
+        pass
