@@ -98,7 +98,7 @@ class Daemon(object):
             if len(container.processes) == 1:
                 if container.power['policy']:
                     container.power['manager'] = PowerPolicyManager(
-                            container.resources['cpus'],
+                            container.resources.cpus,
                             container.power['policy'],
                             float(container.power['damper']),
                             float(container.power['slowdown']))

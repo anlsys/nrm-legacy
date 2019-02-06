@@ -88,7 +88,7 @@ class ApplicationManager(object):
         phase_contexts = dict()
         phase_context_keys = ['set', 'aggregation', 'computetime', 'totaltime']
         if container.power['policy']:
-            ids = container.resources['cpus']
+            ids = container.resources.cpus
             for id in ids:
                 phase_contexts[id] = dict.fromkeys(phase_context_keys)
                 phase_contexts[id]['set'] = False

@@ -126,7 +126,7 @@ class Controller(object):
 
     def run_policy_container(self, container, application):
         """Run policies on a container."""
-        ids = container.resources['cpus']
+        ids = container.resources.cpus
         pcs = application.phase_contexts
         # Run policy only if all phase contexts have been received
         if not filter(lambda i: not pcs[i]['set'], ids):

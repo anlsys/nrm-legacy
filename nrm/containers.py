@@ -46,11 +46,8 @@ class ContainerManager(object):
         ncpus = int(manifest.app.isolators.container.cpus.value)
         nmems = int(manifest.app.isolators.container.mems.value)
         req = resources(ncpus, nmems)
-        alloc = self.resourcemanager.schedule(container_name, req)
-        logger.info("create: allocation: %r", alloc)
-
-        container_resources = dict()
-        container_resources['cpus'], container_resources['mems'] = alloc
+        allocated = self.resourcemanager.schedule(container_name, req)
+        logger.info("create: allocation: %r", allocated)
 
         # Container power settings
         container_power = dict()
@@ -75,10 +72,9 @@ class ContainerManager(object):
         hwbindings = dict()
         if manifest.is_feature_enabled('hwbind'):
             hwbindings['distrib'] = sorted(self.hwloc.distrib(
-                                        ncpus, alloc), key=operator.
+                                        ncpus, allocated), key=operator.
                                             attrgetter('cpus'))
-        return (True, Container(container_name, manifest,
-                                container_resources,
+        return (True, Container(container_name, manifest, allocated,
                                 container_power, {}, {}, hwbindings))
 
     def create(self, request):
@@ -105,9 +101,7 @@ class ContainerManager(object):
                                                                manifest)
         if creation_needed:
             logger.info("Creating container %s", container_name)
-            req = resources(container.resources['cpus'],
-                            container.resources['mems'])
-            self.nodeos.create(container_name, req)
+            self.nodeos.create(container_name, container.resources)
             self.containers[container_name] = container
 
         # build context to execute
