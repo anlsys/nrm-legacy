@@ -258,7 +258,9 @@ class IsolatorList(SpecField):
                 setattr(self, name.lstrip("argo/"), v)
         for k in self.types:
             if self.types[k].required:
-                assert name.lstrip("argo/") in self.__dict__
+                if not hasattr(self, k.lstrip("argo/")):
+                    logger.error("Missing mandatory isolator: %s", k)
+                    return False
         return True
 
 
@@ -318,4 +320,6 @@ class ImageManifest(SpecField):
             if hasattr(isolator, 'enabled'):
                 if isolator.enabled not in true_values:
                     return False
-        return True
+            return True
+        else:
+            return False
