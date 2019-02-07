@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 from applications import ApplicationManager
-from containers import ContainerManager
+from containers import ContainerManager, NodeOSRuntime
 from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
@@ -85,6 +85,7 @@ class Daemon(object):
             self.upstream_rpc_server.sendmsg(RPC_MSG['getpower'](**update),
                                              client)
         elif msg.type == 'run':
+            logger.info("asked to run a command in a container: %r", msg)
             container_uuid = msg.container_uuid
             params = {'manifest': msg.manifest,
                       'file': msg.path,
@@ -98,7 +99,7 @@ class Daemon(object):
             if len(container.processes) == 1:
                 if container.power['policy']:
                     container.power['manager'] = PowerPolicyManager(
-                            container.resources['cpus'],
+                            container.resources.cpus,
                             container.power['policy'],
                             float(container.power['damper']),
                             float(container.power['slowdown']))
@@ -296,12 +297,14 @@ class Daemon(object):
 
         # create managers
         self.resource_manager = ResourceManager(hwloc=self.config.hwloc)
+        container_runtime = \
+            NodeOSRuntime(self.config.argo_nodeos_config)
         self.container_manager = ContainerManager(
-           self.resource_manager,
-           perfwrapper=self.config.argo_perf_wrapper,
-           linuxperf=self.config.perf,
-           argo_nodeos_config=self.config.argo_nodeos_config,
-           pmpi_lib=self.config.pmpi_lib,
+                container_runtime,
+                self.resource_manager,
+                perfwrapper=self.config.argo_perf_wrapper,
+                linuxperf=self.config.perf,
+                pmpi_lib=self.config.pmpi_lib,
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()

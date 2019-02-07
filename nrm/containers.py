@@ -17,14 +17,13 @@ class ContainerManager(object):
     """Manages the creation, listing and deletion of containers, using a
     container runtime underneath."""
 
-    def __init__(self, rm,
+    def __init__(self, container_runtime, rm,
                  perfwrapper="argo-perf-wrapper",
                  linuxperf="perf",
-                 argo_nodeos_config="argo_nodeos_config",
                  pmpi_lib="/usr/lib/libnrm-pmpi.so"):
         self.linuxperf = linuxperf
         self.perfwrapper = perfwrapper
-        self.nodeos = NodeOSClient(argo_nodeos_config=argo_nodeos_config)
+        self.runtime = container_runtime
         self.containers = dict()
         self.pids = dict()
         self.resourcemanager = rm
@@ -32,108 +31,77 @@ class ContainerManager(object):
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
 
+    def _get_container_tuple(self, container_name, manifest):
+        """Retrieve a container tuple if the container exists, otherwise use
+        the manifest to create a new one.
+
+        Returns (bool, container_tuple), the first field telling if a container
+        needs to be created."""
+
+        if container_name in self.containers:
+            return (False, self.containers[container_name])
+
+        # ask the resource manager for resources
+        ncpus = int(manifest.app.isolators.container.cpus.value)
+        nmems = int(manifest.app.isolators.container.mems.value)
+        req = resources(ncpus, nmems)
+        allocated = self.resourcemanager.schedule(container_name, req)
+        logger.info("create: allocation: %r", allocated)
+
+        # Container power settings
+        container_power = dict()
+        container_power['profile'] = None
+        container_power['policy'] = None
+        container_power['damper'] = None
+        container_power['slowdown'] = None
+        container_power['manager'] = None
+
+        if manifest.is_feature_enabled('power'):
+            pp = manifest.app.isolators.power
+            if pp.profile in ["1", "True"]:
+                container_power['profile'] = dict()
+                container_power['profile']['start'] = dict()
+                container_power['profile']['end'] = dict()
+            if pp.policy != "NONE":
+                container_power['policy'] = pp.policy
+                container_power['damper'] = pp.damper
+                container_power['slowdown'] = pp.slowdown
+
+        # Compute hardware bindings
+        hwbindings = dict()
+        if manifest.is_feature_enabled('hwbind'):
+            hwbindings['distrib'] = sorted(self.hwloc.distrib(
+                                        ncpus, allocated), key=operator.
+                                            attrgetter('cpus'))
+        return (True, Container(container_name, manifest, allocated,
+                                container_power, {}, {}, hwbindings))
+
     def create(self, request):
         """Create a container according to the request.
 
         Returns the pid of the container or a negative number for errors."""
-        container = None
-        containerexistsflag = False
-        processes = None
-        clientids = None
-        pp = None
-        hwbindings = None
-        bind_index = 0
 
         manifestfile = request['manifest']
         command = request['file']
         args = request['args']
         environ = request['environ']
         container_name = request['uuid']
-        logger.info("run: manifest file:  %s", manifestfile)
-        logger.info("run: command:        %s", command)
-        logger.info("run: args:           %r", args)
-        logger.info("run: container name: %s", container_name)
-
-        # TODO: Application library to load must be set during configuration
-        apppreloadlibrary = self.pmpi_lib
+        logger.info("create: manifest file:  %s", manifestfile)
+        logger.info("create: command:        %s", command)
+        logger.info("create: args:           %r", args)
+        logger.info("create: container name: %s", container_name)
 
         manifest = ImageManifest()
         if not manifest.load(manifestfile):
             logger.error("Manifest is invalid")
             return None
 
-        if hasattr(manifest.app.isolators, 'scheduler'):
-            sched = manifest.app.isolators.scheduler
-            argv = self.chrt.getwrappedcmd(sched)
-        else:
-            argv = []
-
-        # Check if container exists else create it
-        if container_name in self.containers:
-            container = self.containers[container_name]
-            containerexistsflag = True
-            processes = container.processes
-            clientids = container.clientids
-            hwbindings = container.hwbindings
-            bind_index = len(processes)
-        else:
-            processes = dict()
-            clientids = dict()
-            hwbindings = dict()
-
-            # ask the resource manager for resources
-            ncpus = int(manifest.app.isolators.container.cpus.value)
-            nmems = int(manifest.app.isolators.container.mems.value)
-            req = resources(ncpus, nmems)
-            alloc = self.resourcemanager.schedule(container_name, req)
-            logger.info("run: allocation: %r", alloc)
-
-            # create container
-            logger.info("creating container %s", container_name)
-            self.nodeos.create(container_name, alloc)
-            container_resources = dict()
-            container_resources['cpus'], container_resources['mems'] = alloc
-
-            # Container power settings
-            container_power = dict()
-            container_power['profile'] = None
-            container_power['policy'] = None
-            container_power['damper'] = None
-            container_power['slowdown'] = None
-            container_power['manager'] = None
-
-            # It would've been better if argo-perf-wrapper wrapped around
-            # argo-nodeos-config and not the final command -- that way it would
-            # be running outside of the container.  However, because
-            # argo-nodeos-config is suid root, perf can't monitor it.
-            if hasattr(manifest.app.isolators, 'perfwrapper'):
-                manifest_perfwrapper = manifest.app.isolators.perfwrapper
-                if hasattr(manifest_perfwrapper, 'enabled'):
-                    if manifest_perfwrapper.enabled in ["1", "True"]:
-                        argv.append(self.perfwrapper)
-
-            if hasattr(manifest.app.isolators, 'power'):
-                if hasattr(manifest.app.isolators.power, 'enabled'):
-                    pp = manifest.app.isolators.power
-                    if pp.enabled in ["1", "True"]:
-                        if pp.profile in ["1", "True"]:
-                            container_power['profile'] = dict()
-                            container_power['profile']['start'] = dict()
-                            container_power['profile']['end'] = dict()
-                        if pp.policy != "NONE":
-                            container_power['policy'] = pp.policy
-                            container_power['damper'] = pp.damper
-                            container_power['slowdown'] = pp.slowdown
-
-            # Compute hardware bindings
-            if hasattr(manifest.app.isolators, 'hwbind'):
-                manifest_hwbind = manifest.app.isolators.hwbind
-                if hasattr(manifest_hwbind, 'enabled'):
-                    if manifest_hwbind.enabled in ["1", "True"]:
-                        hwbindings['enabled'] = True
-                        hwbindings['distrib'] = sorted(self.hwloc.distrib(
-                                                ncpus, alloc), key=operator.
-                                                attrgetter('cpus'))
+        creation_needed, container = self._get_container_tuple(container_name,
+                                                               manifest)
+        if creation_needed:
+            logger.info("Creating container %s", container_name)
+            self.runtime.create(container)
+            self.containers[container_name] = container
 
         # build context to execute
         # environ['PATH'] = ("/usr/local/sbin:"
@@ -142,53 +110,61 @@ class ContainerManager(object):
         environ['PERF'] = self.linuxperf
         environ['AC_APP_NAME'] = manifest.name
         environ['AC_METADATA_URL'] = "localhost"
-        if (containerexistsflag and container.power['policy'] is not None) or (
-                pp is not None and pp.policy != "NONE"):
-            environ['LD_PRELOAD'] = apppreloadlibrary
+
+        # power profiling uses LD_PRELOAD, we use get to ensure that it
+        # doesn't crash if the policy doesn't exits.
+        if container.power.get('policy'):
+            environ['LD_PRELOAD'] = self.pmpi_lib
             environ['NRM_TRANSMIT'] = '1'
-            if containerexistsflag:
-                environ['NRM_DAMPER'] = container.power['damper']
-            else:
-                environ['NRM_DAMPER'] = pp.damper
+            environ['NRM_DAMPER'] = container.power['damper']
+
+        # build prefix to the entire command based on enabled features
+        argv = []
+        if manifest.is_feature_enabled('scheduler'):
+            sched = manifest.app.isolators.scheduler
+            argv = self.chrt.getwrappedcmd(sched)
 
         # Use hwloc-bind to launch each process in the conatiner by prepending
         # it as an argument to the command line, if enabled in manifest.
         # The hardware binding computed using hwloc-distrib is used here
         # --single
-        if bool(hwbindings) and hwbindings['enabled']:
+        if container.hwbindings:
+            # round robin over the cpu bindings available
+            bind_index = len(container.processes) % \
+                    len(container.hwbindings['distrib'])
             argv.append('hwloc-bind')
             # argv.append('--single')
-            argv.append('core:'+str(hwbindings['distrib'][bind_index].cpus[0]))
+            cpumask = container.hwbindings['distrib'][bind_index].cpus[0]
+            memmask = container.hwbindings['distrib'][bind_index].mems[0]
+            logging.info('create: binding to: %s, %s', cpumask, memmask)
+            argv.append("core:{}".format(cpumask))
             argv.append('--membind')
-            argv.append('numa:'+str(hwbindings['distrib'][bind_index].mems[0]))
+            argv.append("numa:{}".format(memmask))
+
+        # It would've been better if argo-perf-wrapper wrapped around
+        # argo-nodeos-config and not the final command -- that way it would
+        # be running outside of the container.  However, because
+        # argo-nodeos-config is suid root, perf can't monitor it.
+        if manifest.is_feature_enabled('perfwrapper'):
+            argv.append(self.perfwrapper)
 
         argv.append(command)
         argv.extend(args)
 
         # run my command
-        process = self.nodeos.execute(container_name, argv, environ)
-        processes[process.pid] = process
-        clientids[process.pid] = request['clientid']
+        process = self.runtime.execute(container_name, argv, environ)
 
-        if containerexistsflag:
-            container.processes[process.pid] = process
-            self.pids[process.pid] = container
-            logger.info("Created process %s in container %s", process.pid,
-                        container_name)
-        else:
-            container = Container(container_name, manifest,
-                                  container_resources, container_power,
-                                  processes, clientids, hwbindings)
-            self.pids[process.pid] = container
-            self.containers[container_name] = container
-            logger.info("Container %s created and running : %r",
-                        container_name, container)
-
+        # register the process
+        container.processes[process.pid] = process
+        container.clientids[process.pid] = request['clientid']
+        self.pids[process.pid] = container
+        logger.info("Created process %s in container %s", process.pid,
+                    container_name)
         return process.pid, container
 
     def delete(self, uuid):
         """Delete a container and kill all related processes."""
-        self.nodeos.delete(uuid, kill=True)
+        self.runtime.delete(uuid, kill=True)
         self.resourcemanager.update(uuid)
         c = self.containers[uuid]
         del self.containers[uuid]
@@ -209,3 +185,73 @@ class ContainerManager(object):
         """List the containers in the system."""
         return [{'uuid': c.uuid, 'pid': c.processes.keys()}
                 for c in self.containers.values()]
+
+
+class ContainerRuntime(object):
+
+    """Implements the creation, deleting and spawning of commands for a
+    container runtime."""
+
+    def __init__(self):
+        pass
+
+    def create(self, container):
+        """Create the container defined by the container namedtuple on the
+        system."""
+        raise NotImplementedError
+
+    def execute(self, container_uuid, args, environ):
+        """Execute a command inside a container, using a similar interface to
+        popen.
+
+        Returns a tornado.process.Subprocess"""
+        raise NotImplementedError
+
+    def delete(self, container_uuid, kill=False):
+        """Delete a container, possibly killing all the processes inside."""
+        raise NotImplementedError
+
+
+class NodeOSRuntime(ContainerRuntime):
+
+    """Implements the container runtime interface using the nodeos
+    subprogram."""
+
+    def __init__(self, path="argo_nodeos_config"):
+        """Creates the client for nodeos, with an optional custom
+        path/command."""
+        self.client = NodeOSClient(argo_nodeos_config=path)
+
+    def create(self, container):
+        """Uses the container resource allocation to create a container."""
+        self.client.create(container.uuid, container.resources)
+
+    def execute(self, container_uuid, args, environ):
+        """Launches a command in the container."""
+        return self.client.execute(container_uuid, args, environ)
+
+    def delete(self, container_uuid, kill=False):
+        """Delete the container."""
+        self.client.delete(container_uuid, kill)
+
+
+class DummyRuntime(ContainerRuntime):
+
+    """Implements a dummy runtime that doesn't create any container, but still
+    launches commands."""
+
+    def __init__(self):
+        pass
+
+    def create(self, container):
+        pass
+
+    def execute(self, container_uuid, args, environ):
+        import tornado.process as process
+        return process.Subprocess(args, stdin=process.Subprocess.STREAM,
+                                  stdout=process.Subprocess.STREAM,
+                                  stderr=process.Subprocess.STREAM,
+                                  env=environ)
+
+    def delete(self, container_uuid, kill=False):
+        pass
