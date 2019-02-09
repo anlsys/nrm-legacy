@@ -118,7 +118,7 @@ class NodeOSClient(object):
                for envname, envval in environ.items()]
         cmd += " env:'"+" ".join(env)+"'"
         args.append(cmd)
-        return process.Subprocess(args, stdin=process.Subprocess.STREAM,
+        return process.Subprocess(args,
                                   stdout=process.Subprocess.STREAM,
                                   stderr=process.Subprocess.STREAM)
 
