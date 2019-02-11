@@ -248,7 +248,7 @@ class DummyRuntime(ContainerRuntime):
 
     def execute(self, container_uuid, args, environ):
         import tornado.process as process
-        return process.Subprocess(args, stdin=process.Subprocess.STREAM,
+        return process.Subprocess(args,
                                   stdout=process.Subprocess.STREAM,
                                   stderr=process.Subprocess.STREAM,
                                   env=environ)

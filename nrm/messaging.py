@@ -162,7 +162,7 @@ class UpstreamRPCClient(object):
     def __init__(self, address):
         self.address = address
         self.uuid = str(uuid.uuid4())
-        self.zmq_context = zmq.Context()
+        self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.DEALER)
         self.socket.setsockopt(zmq.IDENTITY, self.uuid)
         self.socket.connect(address)
@@ -195,7 +195,7 @@ class UpstreamRPCServer(object):
 
     def __init__(self, address):
         self.address = address
-        self.zmq_context = zmq.Context()
+        self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.ROUTER)
         self.socket.bind(address)
 
@@ -234,7 +234,7 @@ class UpstreamPubServer(object):
 
     def __init__(self, address):
         self.address = address
-        self.zmq_context = zmq.Context()
+        self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.PUB)
         self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.bind(address)
@@ -251,7 +251,7 @@ class UpstreamPubClient(object):
 
     def __init__(self, address):
         self.address = address
-        self.zmq_context = zmq.Context()
+        self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.SUB)
         self.socket.setsockopt(zmq.SUBSCRIBE, '')
         self.socket.connect(address)
