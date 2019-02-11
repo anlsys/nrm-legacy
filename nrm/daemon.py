@@ -339,8 +339,6 @@ class Daemon(object):
 
 
 def runner(config):
-    ioloop.install()
-
     if config.verbose:
         logger.setLevel(logging.DEBUG)
 
