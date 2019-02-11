@@ -1,9 +1,9 @@
 include: 'https://xgitlab.cels.anl.gov/argo/argotest/raw/master/gitlab/binary_rename.yml'
 
 stages:
+  - style
   - build
   - test
-  - style
 
 py.test:
   stage: test
