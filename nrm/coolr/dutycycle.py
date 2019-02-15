@@ -1,3 +1,13 @@
+###############################################################################
+# Copyright 2019 UChicago Argonne, LLC.
+# (c.f. AUTHORS, LICENSE)
+#
+# This file is part of the NRM project.
+# For more info, see https://xgitlab.cels.anl.gov/argo/nrm
+#
+# SPDX-License-Identifier: BSD-3-Clause
+###############################################################################
+
 """ DutyCycle Module:
     This module contains functions to set duty cyle of each cpu in intervals
     of 6.25% min = 6.25% max(default) = 100%

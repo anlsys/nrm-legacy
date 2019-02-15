@@ -1,3 +1,13 @@
+###############################################################################
+# Copyright 2019 UChicago Argonne, LLC.
+# (c.f. AUTHORS, LICENSE)
+#
+# This file is part of the NRM project.
+# For more info, see https://xgitlab.cels.anl.gov/argo/nrm
+#
+# SPDX-License-Identifier: BSD-3-Clause
+###############################################################################
+
 """Sensor Module:
     provide the core functionalities related to measuring power, energy,
     temperature and other information about the local node, using our internal
