@@ -18,14 +18,6 @@ And entering the resulting virtual environment with `pipenv shell`.
 The NRM code only supports _argo-containers_ for now, so you need to install
 the our container piece on the system for now.
 
-### Alternative - Nix usage.
-
-These dependencies can be obtained using the nix package manager.
-
-```
-nix-shell https://xgitlab.cels.anl.gov/argo/argopkgs/-/archive/master/argopkgs-master.tar.gz -A nodelevel.nrm
-```
-
 ## Basic Usage
 
 Launch the `daemon`, and use `cmd` to interact with it.
