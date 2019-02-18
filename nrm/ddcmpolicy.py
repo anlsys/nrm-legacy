@@ -1,3 +1,13 @@
+###############################################################################
+# Copyright 2019 UChicago Argonne, LLC.
+# (c.f. AUTHORS, LICENSE)
+#
+# This file is part of the NRM project.
+# For more info, see https://xgitlab.cels.anl.gov/argo/nrm
+#
+# SPDX-License-Identifier: BSD-3-Clause
+###############################################################################
+
 """ DDCMPolicy Module:
     This module contains the Dynamic Duty Cycle Modulation (DDCM) based policy
     aimed at mitigating workload imbalance in parallel applications that use
