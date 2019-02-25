@@ -1,18 +1,21 @@
+---
 variables:
-  ARGOPKGS : "https://xgitlab.cels.anl.gov/argo/argopkgs/-/archive/master/argopkgs-master.tar.gz"
-  EXTRA : "--nrm ./."
+  ARGOPKGS: "https://xgitlab.cels.anl.gov/argo/argopkgs/-/archive/master/argopkgs-master.tar.gz"
+  EXTRA: "--nrm ./."
 
 stages:
   - style
   - build
   - test
+  - applications
   - quality
 
 include:
- - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/argonix.yml
- - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/components.yml
- - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/integration.yml
- - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/repoquality.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/argonix.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/components.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/integration.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/applications.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/repoquality.yml
 
 py.test:
   stage: test
@@ -25,5 +28,6 @@ py.test:
 flake8:
   stage: style
   script:
-    - pipenv install --dev
-    - pipenv run flake8
+    - nix run -f "$ARGOPKGS" pythonPackages.flake8 --command flake8
+  tags:
+    - integration
