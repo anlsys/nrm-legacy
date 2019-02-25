@@ -130,7 +130,8 @@ class NodeOSClient(object):
         args.append(cmd)
         return process.Subprocess(args,
                                   stdout=process.Subprocess.STREAM,
-                                  stderr=process.Subprocess.STREAM)
+                                  stderr=process.Subprocess.STREAM,
+                                  close_fds=True)
 
 
 class ChrtClient(object):
