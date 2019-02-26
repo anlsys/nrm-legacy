@@ -240,6 +240,34 @@ class HwBind(SpecField):
         return True
 
 
+class Monitoring(SpecField):
+
+    """Monitoring options (libnrm)."""
+
+    fields = {"enabled": spec(unicode, False),
+              "monitoring": spec(unicode, False),
+              }
+
+    def __init__(self):
+        """Create empty monitoring option object."""
+        pass
+
+    def load(self, data):
+        """Load monitoring options."""
+        ret = super(Monitoring, self).load(data)
+        if not ret:
+            return ret
+        if self.enabled not in ["0", "False", "1", "True"]:
+            logger.error("Invalid value for monitoring options enabled: %s",
+                         self.enabled)
+            return False
+        if self.ratelimit < 0:
+            logger.error("Invalid value for monitoring ratelimit: %s",
+                         self.ratelimit)
+            return False
+        return True
+
+
 class IsolatorList(SpecField):
 
     """Represent the list of isolator in a Manifest."""
@@ -249,6 +277,7 @@ class IsolatorList(SpecField):
              "argo/perfwrapper": spec(PerfWrapper, False),
              "argo/power": spec(Power, False),
              "argo/hwbind": spec(HwBind, False),
+             "argo/monitoring": spec(Monitoring, False),
              }
 
     def __init__(self):

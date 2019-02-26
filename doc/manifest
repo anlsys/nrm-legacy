@@ -35,6 +35,13 @@
 				}
 			},
 			{
+				"name": "argo/monitoring",
+				"value": {
+					 "enabled": "1",
+					 "ratelimit": "10000000"
+				}
+			},
+			{
 				"name": "argo/hwbind",
 				"value": {
 					 "enabled": "1"

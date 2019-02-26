@@ -128,6 +128,11 @@ class ContainerManager(object):
             environ['NRM_TRANSMIT'] = '1'
             environ['NRM_DAMPER'] = container.power['damper']
 
+        # monitoring section involves libnrm
+        if manifest.is_feature_enabled('monitoring'):
+            environ['ARGO_NRM_RATELIMIT'] = \
+                    manifest.app.isolators.monitoring.ratelimit
+
         # build prefix to the entire command based on enabled features
         argv = []
         if manifest.is_feature_enabled('scheduler'):
