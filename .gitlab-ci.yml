@@ -21,7 +21,7 @@ py.test:
   stage: test
   script:
     - pipenv install --dev
-    - pipenv run py.test
+    - pipenv run py.test --deselect=test/test_messaging.py
   tags:
     - rapl
 
