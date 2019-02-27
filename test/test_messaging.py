@@ -76,7 +76,7 @@ def test_msg_convertion(dummy_msg):
 
 
 def test_rpc_connection(upstream_rpc_client, upstream_rpc_server):
-    upstream_rpc_client.wait_connected()
+    upstream_rpc_client.connect()
 
 
 def test_rpc_send_recv(upstream_rpc_client, upstream_rpc_server, dummy_msg):
@@ -104,7 +104,7 @@ def test_pub_server_send(upstream_pub_server, dummy_msg):
 
 
 def test_pub_connection(upstream_pub_client, upstream_pub_server):
-    upstream_pub_client.wait_connected()
+    upstream_pub_client.connect()
 
 
 def test_pub_client_recv(upstream_pub_server, upstream_pub_client, dummy_msg):
@@ -114,7 +114,7 @@ def test_pub_client_recv(upstream_pub_server, upstream_pub_client, dummy_msg):
 
 
 def test_down_connection(downstream_event_client, downstream_event_server):
-    downstream_event_client.wait_connected()
+    downstream_event_client.connect()
 
 
 def test_down_event_send_recv(downstream_event_client, downstream_event_server,

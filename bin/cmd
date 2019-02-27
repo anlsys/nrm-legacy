@@ -59,14 +59,14 @@ class CommandLineInterface(object):
             self.do_signal(None, signum, frame)
         signal.signal(signal.SIGINT, handler)
 
-        self.client.wait_connected()
+        self.client.connect()
 
     def do_listen(self, argv):
         """ Connect to the NRM and listen for pub/sub messages."""
         upstream_pub_port = 2345
         upstream_pub_param = "tcp://localhost:%d" % (upstream_pub_port)
         self.pub_client = nrm.messaging.UpstreamPubClient(upstream_pub_param)
-        self.pub_client.wait_connected()
+        self.pub_client.connect()
 
         while(True):
             msg = self.pub_client.recvmsg()
