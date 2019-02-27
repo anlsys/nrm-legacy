@@ -245,7 +245,7 @@ class Monitoring(SpecField):
     """Monitoring options (libnrm)."""
 
     fields = {"enabled": spec(unicode, False),
-              "monitoring": spec(unicode, False),
+              "ratelimit": spec(unicode, False),
               }
 
     def __init__(self):
