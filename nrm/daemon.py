@@ -341,7 +341,8 @@ class Daemon(object):
 def runner(config):
     ioloop.install()
 
-    logger.setLevel(logging.DEBUG)
+    if config.verbose:
+        logger.setLevel(logging.DEBUG)
 
     if config.nrm_log:
         print("Logging to %s" % config.nrm_log)
