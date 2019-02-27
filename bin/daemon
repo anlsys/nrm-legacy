@@ -56,6 +56,8 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser(parents=[conf_parser])
     parser.set_defaults(**defaults)
+    parser.add_argument("-v", "--verbose", help="increase output verbosity",
+                        action="store_true")
     parser.add_argument(
            "--nrm_log",
            help="Main log file. Override default with the NRM_LOG."
