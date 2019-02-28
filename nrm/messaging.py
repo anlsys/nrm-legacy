@@ -175,12 +175,14 @@ class UpstreamRPCClient(object):
         self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.DEALER)
         self.socket.setsockopt(zmq.IDENTITY, self.uuid)
-        self.socket.connect(address)
+        self.socket.setsockopt(zmq.SNDHWM, 0)
+        self.socket.setsockopt(zmq.RCVHWM, 0)
 
-    def wait_connected(self):
-        """Creates a monitor socket and wait for the connect event."""
+    def connect(self, wait=True):
+        """Connect, and wait for the socket to be connected."""
         monitor = self.socket.get_monitor_socket()
-        while True:
+        self.socket.connect(self.address)
+        while wait:
             msg = zmq.utils.monitor.recv_monitor_message(monitor)
             logger.debug("monitor message: %r", msg)
             if int(msg['event']) == zmq.EVENT_CONNECTED:
@@ -207,6 +209,8 @@ class UpstreamRPCServer(object):
         self.address = address
         self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.ROUTER)
+        self.socket.setsockopt(zmq.SNDHWM, 0)
+        self.socket.setsockopt(zmq.RCVHWM, 0)
         self.socket.bind(address)
 
     def recvmsg(self):
@@ -247,6 +251,7 @@ class UpstreamPubServer(object):
         self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.PUB)
         self.socket.setsockopt(zmq.LINGER, 0)
+        self.socket.setsockopt(zmq.SNDHWM, 0)
         self.socket.bind(address)
 
     def sendmsg(self, msg):
@@ -263,13 +268,14 @@ class UpstreamPubClient(object):
         self.address = address
         self.zmq_context = zmq.Context.instance()
         self.socket = self.zmq_context.socket(zmq.SUB)
+        self.socket.setsockopt(zmq.RCVHWM, 0)
         self.socket.setsockopt(zmq.SUBSCRIBE, '')
-        self.socket.connect(address)
 
-    def wait_connected(self):
+    def connect(self, wait=True):
         """Creates a monitor socket and wait for the connect event."""
         monitor = self.socket.get_monitor_socket()
-        while True:
+        self.socket.connect(self.address)
+        while wait:
             msg = zmq.utils.monitor.recv_monitor_message(monitor)
             logger.debug("monitor message: %r", msg)
             if int(msg['event']) == zmq.EVENT_CONNECTED:

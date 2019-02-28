@@ -53,7 +53,7 @@ class PerfWrapper(object):
     def setup(self):
         downstream_url = "ipc:///tmp/nrm-downstream-event"
         self.downstream_event = messaging.DownstreamEventClient(downstream_url)
-        self.downstream_event.wait_connected()
+        self.downstream_event.connect()
         logger.info("downstream pub socket connected to: %s", downstream_url)
 
         # retrieve our container uuid
