@@ -261,8 +261,8 @@ class CommandLineInterface(object):
                                    help="container uuid to listen for",
                                    default=None)
         parser_listen.add_argument("-f", "--filter",
-                                   help="type of message to filter and \
-                                        \ prettyprint, in {power,performance}",
+                                   help="type of message to filter and"
+                                        " prettyprint, in {power,performance}",
                                    default=None)
         parser_listen.set_defaults(func=self.do_listen)
 

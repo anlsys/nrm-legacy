@@ -44,8 +44,8 @@ class PerfWrapper(object):
         update = {'api': 'down_event',
                   'type': 'performance',
                   'payload': performance,
-                  'container_uuid' : self.container_uuid,
-                  'application_uuid' : self.app_uuid,
+                  'container_uuid': self.container_uuid,
+                  'application_uuid': self.app_uuid,
                   }
         msg = PUB_MSG['performance'](**update)
         self.downstream_event.sendmsg(msg)
