@@ -59,6 +59,10 @@ def main(argv=None):
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_true")
     parser.add_argument(
+           "--powercap",
+           help="The powercap policy to use. Currently, a cap value in watts.",
+           default=120)
+    parser.add_argument(
            "--nrm_log",
            help="Main log file. Override default with the NRM_LOG."
                 "environment variable",

@@ -12,7 +12,7 @@ from __future__ import print_function
 
 from applications import ApplicationManager
 from containers import ContainerManager, NodeOSRuntime
-from controller import Controller, PowerActuator
+from controllers import DDCMController, NodePowerController
 from powerpolicy import PowerPolicyManager
 from functools import partial
 import logging
@@ -65,6 +65,7 @@ class Daemon(object):
                    'container_uuid': msg.container_uuid}
             self.upstream_pub_server.sendmsg(
                     PUB_MSG['performance'](**pub))
+            self.nodepowercontroller.feed_performance(msg.payload)
         elif msg.type == 'phase_context':
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
@@ -75,7 +76,7 @@ class Daemon(object):
                     if c.power['policy']:
                         app.update_phase_context(msg)
                         # Run container policy
-                        self.controller.run_policy_container(c, app)
+                        self.ddcmcontroller.run_policy_container(c, app)
         elif msg.type == 'application_exit':
             uuid = msg.application_uuid
             if uuid in self.application_manager.applications:
@@ -178,6 +179,7 @@ class Daemon(object):
             logger.error("power sensor format malformed, "
                          "can not report power upstream.")
         else:
+            self.nodepowercontroller.feed_power(total_power)
             msg = {'api': 'up_pub',
                    'type': 'power',
                    'total': total_power,
@@ -187,14 +189,7 @@ class Daemon(object):
             logger.info("sending sensor message: %r", msg)
 
     def do_control(self):
-        plan = self.controller.planify(self.target, self.machine_info)
-        action, actuator = plan
-        if action:
-            self.controller.execute(action, actuator)
-            self.controller.update(action, actuator)
-        # Call policy only if there are containers
-        # if self.container_manager.containers:
-            # self.controller.run_policy(self.container_manager.containers)
+        self.nodepowercontroller.step()
 
     def do_signal(self, signum, frame):
         if signum == signal.SIGINT:
@@ -318,8 +313,15 @@ class Daemon(object):
            )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
-        pa = PowerActuator(self.sensor_manager)
-        self.controller = Controller([pa])
+
+        self.ddcmcontroller = DDCMController()
+        self.nodepowercontroller = NodePowerController(
+                upstream_pub_server=self.upstream_pub_server,
+                powercap=self.config.powercap,
+                sensor_manager=self.sensor_manager,
+                upstream_pub=self.upstream_pub_server,
+                period=1
+                )
 
         self.sensor_manager.start()
         self.machine_info = self.sensor_manager.do_update()

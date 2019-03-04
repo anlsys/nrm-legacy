@@ -310,7 +310,12 @@ class rapl_reader:
             print 'Failed to update:', fn, '(root privilege is required)'
             return
         f.write('%d' % uw)
-        f.close()
+        try:
+            f.close()
+        except:
+            print('Failed to close file %s' % fn)
+            print('make sure that the bios allows changing the package powercap.')
+            print('debug this with `dmesg`.')
 
     def set_powerlimit(self, newval, dom):
         l = self.dirs[dom]

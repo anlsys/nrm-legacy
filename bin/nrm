@@ -83,6 +83,14 @@ class CommandLineInterface(object):
                         if msg.type == "power":
                             print("%s, %s, %s" % (msg.type, time.time(),
                                                   msg.total))
+                        if msg.type == "control":
+                            print("%s, %s, %s, %s, %s, %s"
+                                  % (msg.type,
+                                     msg.powercap,
+                                     msg.power,
+                                     msg.performance,
+                                     msg.control_time,
+                                     msg.feedback_time))
                         if msg.type == "container_exit":
                             print("%s, %s, %s" % (msg.type, time.time(),
                                                   msg.profile_data))
@@ -189,6 +197,7 @@ class CommandLineInterface(object):
                             "daemon: %s" % str(exitmsg.status))
                     sys.exit(1)
                 break
+            sys.stdout.flush()
 
     def do_list(self, argv):
         """Connect to the NRM and ask to list the containers present on the

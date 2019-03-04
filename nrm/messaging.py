@@ -94,6 +94,13 @@ MSGFORMATS['up_pub'] = {
         'progress':             {
             'application_uuid': basestring,
             'payload':          int
+            },
+        'control':             {
+            'powercap':         int,
+            'power':            float,
+            'performance':      float,
+            'control_time':     float,
+            'feedback_time':    float
             }
         }
 
