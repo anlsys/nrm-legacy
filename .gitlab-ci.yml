@@ -28,6 +28,6 @@ py.test:
 flake8:
   stage: style
   script:
-    - nix run -f "$ARGOPKGS" pythonPackages.flake8 --command flake8
+    - nix run -f "$ARGOPKGS" pythonPackages.flake8 --command flake8 nrm/* bin/*
   tags:
     - integration
