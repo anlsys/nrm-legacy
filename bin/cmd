@@ -83,14 +83,12 @@ class CommandLineInterface(object):
                         if msg.type == "power":
                             print("%s, %s, %s" % (msg.type, time.time(),
                                                   msg.total))
-                        sys.stdout.flush()
                         if msg.type == "container_exit":
                             print("%s, %s, %s" % (msg.type, time.time(),
                                                   msg.profile_data))
-                        sys.stdout.flush()
                 else:
                     print("%s, %s" % (msg.type, time.time()))
-                    sys.stdout.flush()
+                sys.stdout.flush()
 
             print_if_filter()
             # if argv.uuid:
@@ -157,12 +155,14 @@ class CommandLineInterface(object):
                     outeof = True
                 else:
                     print(msg.payload)
+                    sys.stdout.flush()
             elif msg.type == 'stderr':
                 logger.debug("container msg: %r", msg)
                 if msg.payload == 'eof':
                     erreof = True
                 else:
                     print(msg.payload, file=sys.stderr)
+                    sys.stdout.flush()
             elif msg.type == 'process_exit':
                 logger.info("process ended: %r", msg)
                 state = 'exiting'
