@@ -233,7 +233,7 @@ class Daemon(object):
                     # Remove the pid of process that is finished
                     container.processes.pop(pid, None)
                     self.container_manager.pids.pop(pid, None)
-                    logger.info("Process %s in Container %s has finised.",
+                    logger.info("Process %s in Container %s has finished.",
                                 pid, container.uuid)
 
                     # if this is the last process in the container,
