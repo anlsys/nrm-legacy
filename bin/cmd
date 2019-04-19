@@ -58,6 +58,7 @@ class CommandLineInterface(object):
         def handler(signum, frame):
             self.do_signal(None, signum, frame)
         signal.signal(signal.SIGINT, handler)
+        signal.signal(signal.SIGTERM, handler)
 
         self.client.connect()
 
