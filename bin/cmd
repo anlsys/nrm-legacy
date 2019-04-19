@@ -172,7 +172,21 @@ class CommandLineInterface(object):
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
                 logger.info("command ended: %r", exitmsg)
-                sys.exit(int(exitmsg.status))
+                if os.WIFSIGNALED(exitmsg.status):
+                    logger.error("command ended due to signal %s" %
+                                 str(os.WTERMSIG(exitmsg.status)))
+                    sys.exit(1)
+                elif os.WIFEXITED(exitmsg.status):
+                    s = int(os.WTERMSIG(exitmsg.status))
+                    if s > 0:
+                        logger.debug("command ended with exit code %s" %
+                                     str(s))
+                    sys.exit(s)
+                else:
+                    logger.error(
+                            "non-compliant exit code received from"
+                            "daemon: %s" % str(exitmsg.status))
+                    sys.exit(1)
                 break
 
     def do_list(self, argv):
