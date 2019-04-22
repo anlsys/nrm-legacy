@@ -171,13 +171,14 @@ class CommandLineInterface(object):
                 logger.error("unexpected message: %r", msg)
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
+                istatus = int(exitmsg.status)
                 logger.info("command ended: %r", exitmsg)
-                if os.WIFSIGNALED(exitmsg.status):
+                if os.WIFSIGNALED(istatus):
                     logger.error("command ended due to signal %s" %
-                                 str(os.WTERMSIG(exitmsg.status)))
+                                 str(os.WTERMSIG(istatus)))
                     sys.exit(1)
-                elif os.WIFEXITED(exitmsg.status):
-                    s = int(os.WTERMSIG(exitmsg.status))
+                elif os.WIFEXITED(istatus):
+                    s = int(os.WTERMSIG(istatus))
                     if s > 0:
                         logger.debug("command ended with exit code %s" %
                                      str(s))
