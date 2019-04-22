@@ -19,13 +19,13 @@ from schema import loadschema
 
 
 _logger = logging.getLogger('nrm')
-_UpstreamRep = loadschema('upstreamRep')
-_UpstreamPub = loadschema('upstreamPub')
+_UpstreamRep = loadschema('json', 'upstreamRep')
+_UpstreamPub = loadschema('json', 'upstreamPub')
 
 
 def send(apiname):
     def wrap(cls):
-        model = loadschema(apiname)
+        model = loadschema('json', apiname)
 
         def send(self, *args, **kwargs):
             self.socket.send(
@@ -38,7 +38,7 @@ def send(apiname):
 
 def recv_callback(apiname):
     def wrap(cls):
-        model = loadschema(apiname)
+        model = loadschema('json', apiname)
 
         def recv(self):
             """Receives a response to a message."""

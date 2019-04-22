@@ -10,13 +10,22 @@
 
 import warlock
 import json
+import yaml
 import os
 from jsonschema import Draft4Validator
 
+_jsonexts = ["json"]
+_yamlexts = ["yml", "yaml"]
 
-def loadschema(api):
+
+def loadschema(ext, api):
     sourcedir = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(sourcedir, "schemas", api+".json")) as f:
-        s = json.load(f)
+    with open(os.path.join(sourcedir, "schemas", api+"."+ext)) as f:
+        if ext in _jsonexts:
+            s = json.load(f)
+        elif ext in _yamlexts:
+            s = yaml.load(f)
+        else:
+            raise("Schema extension not in %s" % str(_jsonexts + _yamlexts))
         Draft4Validator.check_schema(s)
         return(warlock.model_factory(s))

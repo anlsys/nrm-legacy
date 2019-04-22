@@ -55,8 +55,8 @@ class ContainerManager(object):
             return (False, self.containers[container_name])
 
         # ask the resource manager for resources
-        ncpus = manifest.app['container']['cpus']
-        nmems = manifest.app['container']['mems']
+        ncpus = manifest.app['slice']['cpus']
+        nmems = manifest.app['slice']['mems']
         req = resources(ncpus, nmems)
         allocated = self.resourcemanager.schedule(container_name, req)
         logger.info("create: allocation: %r", allocated)

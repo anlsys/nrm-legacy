@@ -8,10 +8,12 @@ stages:
   - build
   - test
   - applications
+  - docs
   - quality
 
 include:
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/argonix.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/nrm.yml
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/components.yml
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/integration.yml
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/applications.yml
