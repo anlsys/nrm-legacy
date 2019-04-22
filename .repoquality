@@ -1,6 +1,6 @@
 nrm/*.py
 nrm/coolr/*.py
 tests/*.py
-bin/daemon
-bin/cmd
-bin/argo-perf-wrapper
+bin/nrmd
+bin/nrm
+bin/nrm-perfwrapper

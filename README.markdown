@@ -20,7 +20,7 @@ the our container piece on the system for now.
 
 ## Basic Usage
 
-Launch the `daemon`, and use `cmd` to interact with it.
+Launch `nrmd` and use `nrm` to interact with it.
 
 ## Additional Info
 
