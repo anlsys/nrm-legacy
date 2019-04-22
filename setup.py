@@ -21,5 +21,5 @@ setup(
 
     packages=find_packages(),
     install_requires=[],
-    scripts=['bin/daemon', 'bin/app', 'bin/cmd', 'bin/argo-perf-wrapper']
+    scripts=['bin/nrmd', 'bin/app', 'bin/nrm', 'bin/nrm-perfwrapper']
 )
