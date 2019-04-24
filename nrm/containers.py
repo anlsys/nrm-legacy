@@ -28,7 +28,7 @@ class ContainerManager(object):
     container runtime underneath."""
 
     def __init__(self, container_runtime, rm,
-                 perfwrapper="argo-perf-wrapper",
+                 perfwrapper="nrm-perfwrapper",
                  linuxperf="perf",
                  pmpi_lib="/usr/lib/libnrm-pmpi.so"):
         self.linuxperf = linuxperf
