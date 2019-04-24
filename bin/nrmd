@@ -42,7 +42,7 @@ def main(argv=None):
     defaults = {"nrm_log": "/tmp/nrm.log",
                 "hwloc": "hwloc",
                 "perf": "perf",
-                "argo_perf_wrapper": "argo-perf-wrapper",
+                "argo_perf_wrapper": "nrm-perfwrapper",
                 "argo_nodeos_config": "argo_nodeos_config",
                 "pmpi_lib": "/usr/lib/libnrm-pmpi.so",
                 }
@@ -100,7 +100,7 @@ def main(argv=None):
                  "necessary. Override default with the PERFWRAPPER "
                  "environment variable.",
             default=os.environ.get('ARGO_PERF_WRAPPER',
-                                   'argo-perf-wrapper'))
+                                   'nrm-perfwrapper'))
     args = parser.parse_args(remaining_argv)
     nrm.daemon.runner(config=args)
     return(0)
