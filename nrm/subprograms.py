@@ -154,8 +154,17 @@ class SingularityClient(object):
 
         singularity exec --bind ... container.sif <command>"""
         args = [self.prefix]  # singularity
-        args.extend(['exec', '--bind', '/tmp/nrm-downstream-event',
-                     container_image])
+        args.append('exec')
+        # if the monitoring is active, and is a file, we need to bind it into
+        # the container
+        uri = environ.get('ARGO_NRM_DOWNSTREAM_EVENT_URI')
+        if uri:
+            is_file = uri.startswith('ipc://')
+            if is_file:
+                bind_arg = uri[6:]
+                args.extend(['--bind', bind_arg])
+
+        args.append(container_image)
         args.extend(argv)
         return process.Subprocess(args, env=environ,
                                   stdout=process.Subprocess.STREAM,

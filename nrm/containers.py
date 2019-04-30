@@ -30,7 +30,8 @@ class ContainerManager(object):
     def __init__(self, container_runtime, rm,
                  perfwrapper="nrm-perfwrapper",
                  linuxperf="perf",
-                 pmpi_lib="/usr/lib/libnrm-pmpi.so"):
+                 pmpi_lib="/usr/lib/libnrm-pmpi.so",
+                 downstream_event_uri="ipc:///tmp/nrm-downstream-event"):
         self.linuxperf = linuxperf
         self.perfwrapper = perfwrapper
         self.runtime = container_runtime
@@ -40,6 +41,7 @@ class ContainerManager(object):
         self.hwloc = rm.hwloc
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
+        self.downstream_event_uri = downstream_event_uri
 
     def _get_container_tuple(self, container_name, manifest):
         """Retrieve a container tuple if the container exists, otherwise use
@@ -132,6 +134,11 @@ class ContainerManager(object):
         if manifest.is_feature_enabled('monitoring'):
             environ['ARGO_NRM_RATELIMIT'] = \
                     manifest.app.isolators.monitoring.ratelimit
+
+        if container.power.get('policy') or \
+                manifest.is_feature_enabled('monitoring'):
+            environ['ARGO_NRM_DOWNSTREAM_EVENT_URI'] = \
+                    self.downstream_event_uri
 
         # build prefix to the entire command based on enabled features
         argv = []

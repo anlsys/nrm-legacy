@@ -321,7 +321,8 @@ class Daemon(object):
                 perfwrapper=self.config.argo_perf_wrapper,
                 linuxperf=self.config.perf,
                 pmpi_lib=self.config.pmpi_lib,
-           )
+                downstream_event_uri=downstream_event_param,
+        )
         self.application_manager = ApplicationManager()
         self.sensor_manager = SensorManager()
         pa = PowerActuator(self.sensor_manager)
