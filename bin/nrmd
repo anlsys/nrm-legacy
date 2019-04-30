@@ -62,15 +62,15 @@ def main(argv=None):
                         action="store_true")
     parser.add_argument(
            "--nrm_log",
-           help="Main log file. Override default with the NRM_LOG."
+           help="Main log file. Override default with the NRM_LOG "
                 "environment variable",
            default=os.environ.get('NRM_LOG',
                                   '/tmp/nrm.log'))
     parser.add_argument(
             '--hwloc',
             help="Path to the hwloc to use. This path can be "
-                 "relative and makes uses of the $PATH if necessary."
-                 "Override default with the HWLOC environment"
+                 "relative and makes uses of the $PATH if necessary. "
+                 "Override default with the HWLOC environment "
                  "variable.",
             default=os.environ.get('HWLOC',
                                    'hwloc'))
@@ -84,20 +84,20 @@ def main(argv=None):
                                    'argo_nodeos_config'))
     parser.add_argument(
             '--perf',
-            help="Path to the linux perf tool to use. This path can be"
-                 "relative and makes uses of the $PATH if necessary."
-                 "Override default with the PERF environment"
+            help="Path to the linux perf tool to use. This path can be "
+                 "relative and makes uses of the $PATH if necessary. "
+                 "Override default with the PERF environment "
                  "variable.",
             default=os.environ.get('PERF',
                                    'perf'))
     parser.add_argument(
             '--pmpi_lib',
-            help="Path to the libnrm PMPI library used for the power policy"
+            help="Path to the libnrm PMPI library used for the power policy. "
                  "Override default with the PMPI environment variable.",
             default=os.environ.get('PMPI', defaults['pmpi_lib']))
     parser.add_argument(
             '--argo_perf_wrapper',
-            help="Path to the linux perf tool to use. This path can"
+            help="Path to the linux perf tool to use. This path can "
                  "be relative and makes uses of the $PATH if "
                  "necessary. Override default with the PERFWRAPPER "
                  "environment variable.",
