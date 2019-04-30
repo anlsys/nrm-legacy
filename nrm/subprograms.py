@@ -141,6 +141,28 @@ class NodeOSClient(object):
                                   cwd=environ['PWD'])
 
 
+class SingularityClient(object):
+
+    """Client to singularity."""
+
+    def __init__(self, singularity_path="singularity"):
+        """Load client configuration."""
+        self.prefix = singularity_path
+
+    def execute(self, container_image, argv, environ):
+        """Execute argv inside container.
+
+        singularity exec --bind ... container.sif <command>"""
+        args = [self.prefix]  # singularity
+        args.extend(['exec', '--bind', '/tmp/nrm-downstream-event',
+                     container_image])
+        args.extend(argv)
+        return process.Subprocess(args, env=environ,
+                                  stdout=process.Subprocess.STREAM,
+                                  stderr=process.Subprocess.STREAM,
+                                  close_fds=True)
+
+
 class ChrtClient(object):
 
     """Client to chrt command line wrapper."""

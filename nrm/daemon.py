@@ -11,7 +11,7 @@
 from __future__ import print_function
 
 from applications import ApplicationManager
-from containers import ContainerManager, NodeOSRuntime
+from containers import ContainerManager, NodeOSRuntime, SingularityUserRuntime
 from controller import Controller, PowerActuator
 from powerpolicy import PowerPolicyManager
 from functools import partial
@@ -307,8 +307,14 @@ class Daemon(object):
 
         # create managers
         self.resource_manager = ResourceManager(hwloc=self.config.hwloc)
-        container_runtime = \
-            NodeOSRuntime(self.config.argo_nodeos_config)
+        container_runtime = None
+        if self.config.container_runtime == 'nodeos':
+            container_runtime = \
+                NodeOSRuntime(path=self.config.argo_nodeos_config)
+        elif self.config.container_runtime == 'singularity':
+            container_runtime = \
+                SingularityUserRuntime(self.config.singularity)
+        assert(container_runtime is not None)
         self.container_manager = ContainerManager(
                 container_runtime,
                 self.resource_manager,

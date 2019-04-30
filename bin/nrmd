@@ -45,6 +45,8 @@ def main(argv=None):
                 "argo_perf_wrapper": "nrm-perfwrapper",
                 "argo_nodeos_config": "argo_nodeos_config",
                 "pmpi_lib": "/usr/lib/libnrm-pmpi.so",
+                "singularity": "singularity",
+                "container_runtime": "nodeos",
                 }
 
     if args.print_defaults:
@@ -101,6 +103,20 @@ def main(argv=None):
                  "environment variable.",
             default=os.environ.get('ARGO_PERF_WRAPPER',
                                    'nrm-perfwrapper'))
+    parser.add_argument(
+            '--singularity',
+            help="Path to the singularity command. "
+                 "Override default with the SINGULARITY environment variable.",
+            default=os.environ.get('SINGULARITY', defaults['singularity']))
+    parser.add_argument(
+            '--container-runtime',
+            help="Choice of container runtime. "
+                 "Override default with the ARGO_CONTAINER_RUNTIME "
+                 "environment variable.",
+            choices=['nodeos', 'singularity'],
+            default=os.environ.get('ARGO_CONTAINER_RUNTIME',
+                                   defaults['container_runtime']))
+
     args = parser.parse_args(remaining_argv)
     nrm.daemon.runner(config=args)
     return(0)

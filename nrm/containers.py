@@ -13,7 +13,7 @@ from __future__ import print_function
 from aci import ImageManifest
 from collections import namedtuple
 import logging
-from subprograms import ChrtClient, NodeOSClient, resources
+from subprograms import ChrtClient, NodeOSClient, resources, SingularityClient
 import operator
 
 logger = logging.getLogger('nrm')
@@ -248,6 +248,55 @@ class NodeOSRuntime(ContainerRuntime):
     def delete(self, container_uuid, kill=False):
         """Delete the container."""
         self.client.delete(container_uuid, kill)
+
+
+class SingularityRootRuntime(ContainerRuntime):
+
+    """Implements the container runtime interface using the singularity
+    subprogram."""
+
+    def __init__(self, path="argo_singularity_config"):
+        """Creates the client for singularity, with an optional custom
+        path/command."""
+        self.client = SingularityClient(argo_singularity_config=path)
+
+    def create(self, container):
+        """Uses the container resource allocation to create a container."""
+        self.client.oci_start(container.uuid, container.resources)
+
+    def execute(self, container_uuid, args, environ):
+        """Launches a command in the container."""
+        return self.client.oci_execute(container_uuid, args, environ)
+
+    def delete(self, container_uuid, kill=False):
+        """Delete the container."""
+        self.client.oci_delete(container_uuid, kill)
+
+
+class SingularityUserRuntime(ContainerRuntime):
+
+    """Implements the container runtime interface using the singularity
+    subprogram."""
+
+    def __init__(self, path="singularity"):
+        """Creates the client for singularity, with an optional custom
+        path/command."""
+        self.client = SingularityClient(singularity_path=path)
+        self.containers = dict()
+
+    def create(self, container):
+        """Uses the container resource allocation to create a container."""
+        self.containers[container.uuid] = container
+
+    def execute(self, container_uuid, args, environ):
+        """Launches a command in the container."""
+        imageinfo = self.containers[container_uuid].manifest.image
+        # not checking image because singularity supports all types
+        return self.client.execute(imageinfo.path, args, environ)
+
+    def delete(self, container_uuid, kill=False):
+        """Delete the container."""
+        del self.containers[container_uuid]
 
 
 class DummyRuntime(ContainerRuntime):

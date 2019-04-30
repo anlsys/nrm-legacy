@@ -321,6 +321,29 @@ class App(SpecField):
         return super(App, self).load(data)
 
 
+class Image(SpecField):
+
+    """Information on the container image to use."""
+
+    fields = {"path": spec(unicode, True),
+              "type": spec(unicode, True),
+              }
+
+    def __init__(self):
+        """Create an empty image."""
+        pass
+
+    def load(self, data):
+        """Load from json dict."""
+        ret = super(Image, self).load(data)
+        if not ret:
+            return ret
+        if self.type not in ['sif', 'docker']:
+            logger.error("Image type not recognized")
+            return False
+        return True
+
+
 class ImageManifest(SpecField):
 
     """Represent an ACI Image Manifest."""
@@ -329,6 +352,7 @@ class ImageManifest(SpecField):
               "acVersion": spec(unicode, True),
               "name": spec(unicode, True),
               "app": spec(App, True),
+              "image": spec(Image, False),
               }
 
     def __init__(self):
