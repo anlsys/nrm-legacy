@@ -6,8 +6,8 @@ name = "pypi"
 [packages]
 "e1839a8" = {path = ".", editable = true}
 six = "==1.11.0"
-pyzmq = "==16.0.4"
-tornado = "==4.5.3"
+pyzmq = "*"
+tornado = "*"
 numpy = "*"
 argparse = "*"
 
