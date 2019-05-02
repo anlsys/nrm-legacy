@@ -131,7 +131,8 @@ class NodeOSClient(object):
         return process.Subprocess(args,
                                   stdout=process.Subprocess.STREAM,
                                   stderr=process.Subprocess.STREAM,
-                                  close_fds=True)
+                                  close_fds=True,
+                                  cwd=environ['PWD'])
 
 
 class ChrtClient(object):
