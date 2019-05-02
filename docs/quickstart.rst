@@ -117,11 +117,10 @@ enables power monitoring::
 
 This manifest can be used in the following way to launch a command::
 
- nrm run /path/to/manifest.json echo "foobar"
-
-  foobar
-  INFO:nrm:process ended: msg_up_rpc_rep_process_exit(api=u'up_rpc_rep', container_uuid=u'b54f12ed-6418-4b32-b6ab-2dda7503a1c8', status=u'0', type=u'process_exit')
-  INFO:nrm:command ended: msg_up_rpc_rep_process_exit(api=u'up_rpc_rep', container_uuid=u'b54f12ed-6418-4b32-b6ab-2dda7503a1c8', status=u'0', type=u'process_exit')
+ $ nrm run /path/to/manifest.json echo "foobar"
+ foobar
+ INFO:nrm:process ended: msg_up_rpc_rep_process_exit(api=u'up_rpc_rep', container_uuid=u'b54f12ed-6418-4b32-b6ab-2dda7503a1c8', status=u'0', type=u'process_exit')
+ INFO:nrm:command ended: msg_up_rpc_rep_process_exit(api=u'up_rpc_rep', container_uuid=u'b54f12ed-6418-4b32-b6ab-2dda7503a1c8', status=u'0', type=u'process_exit')
 
 You have run your first nrm-enabled command. See the :doc:`manifest
 guide <manifest>` for an in-depth description of the manifest file format.
