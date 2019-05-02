@@ -83,8 +83,14 @@ class NodeOSClient(object):
         cmd += ' cpus:[{0}]'.format(",".join([str(x) for x in params.cpus]))
         cmd += ' mems:[{0}]'.format(",".join([str(x) for x in params.mems]))
         args.append(cmd)
-        p = subprocess.Popen(args, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+        try:
+            p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+        except OSError:
+            logger.error("Could not run argo_nodeos_config. Use either the"
+                         "--argo_nodeos_config nrmd option or the"
+                         " ARGO_NODEOS_CONFIG env var. to configure it.")
+
         stdout, stderr = p.communicate()
         logpopen(p, args, stdout, stderr)
 
