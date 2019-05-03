@@ -149,27 +149,47 @@ class SingularityClient(object):
         """Load client configuration."""
         self.prefix = singularity_path
 
-    def execute(self, container_image, argv, environ):
+    def instance_start(self, instance_name, container_image, bind_list=[]):
+        """Start a named instance of a container image.
+
+        Note that singularity will also start the startscript if
+        defined in the container image, which might be an issue."""
+        args = [self.prefix]
+        args.extend(['instance', 'start'])
+        if bind_list:
+            args.extend(['--bind', ','.join(bind_list)])
+        args.extend([container_image, instance_name])
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        logpopen(p, args, stdout, stderr)
+
+    def execute(self, instance_name, argv, environ):
         """Execute argv inside container.
 
-        singularity exec --bind ... container.sif <command>"""
+        singularity exec instance://instance_name <command>"""
         args = [self.prefix]  # singularity
-        args.append('exec')
-        # if the monitoring is active, and is a file, we need to bind it into
-        # the container
-        uri = environ.get('ARGO_NRM_DOWNSTREAM_EVENT_URI')
-        if uri:
-            is_file = uri.startswith('ipc://')
-            if is_file:
-                bind_arg = uri[6:]
-                args.extend(['--bind', bind_arg])
-
-        args.append(container_image)
+        container_name = "instance://" + instance_name
+        args.extend(['exec', container_name])
         args.extend(argv)
         return process.Subprocess(args, env=environ,
                                   stdout=process.Subprocess.STREAM,
                                   stderr=process.Subprocess.STREAM,
-                                  close_fds=True)
+                                  close_fds=True,
+                                  cwd=environ['PWD'])
+
+    def instance_stop(self, instance_name, kill=False):
+        """Stop an instance and kill everything in it."""
+
+        args = [self.prefix]
+        args.extend(['instance', 'stop'])
+        if kill:
+            args.append("--force")
+        args.append(instance_name)
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        logpopen(p, args, stdout, stderr)
 
 
 class ChrtClient(object):

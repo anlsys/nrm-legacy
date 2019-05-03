@@ -112,7 +112,7 @@ class ContainerManager(object):
                                                                manifest)
         if creation_needed:
             logger.info("Creating container %s", container_name)
-            self.runtime.create(container)
+            self.runtime.create(container, self.downstream_event_uri)
             self.containers[container_name] = container
 
         # build context to execute
@@ -217,7 +217,7 @@ class ContainerRuntime(object):
     def __init__(self):
         pass
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         """Create the container defined by the container namedtuple on the
         system."""
         raise NotImplementedError
@@ -244,7 +244,7 @@ class NodeOSRuntime(ContainerRuntime):
         path/command."""
         self.client = NodeOSClient(argo_nodeos_config=path)
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         """Uses the container resource allocation to create a container."""
         self.client.create(container.uuid, container.resources)
 
@@ -257,29 +257,6 @@ class NodeOSRuntime(ContainerRuntime):
         self.client.delete(container_uuid, kill)
 
 
-class SingularityRootRuntime(ContainerRuntime):
-
-    """Implements the container runtime interface using the singularity
-    subprogram."""
-
-    def __init__(self, path="argo_singularity_config"):
-        """Creates the client for singularity, with an optional custom
-        path/command."""
-        self.client = SingularityClient(argo_singularity_config=path)
-
-    def create(self, container):
-        """Uses the container resource allocation to create a container."""
-        self.client.oci_start(container.uuid, container.resources)
-
-    def execute(self, container_uuid, args, environ):
-        """Launches a command in the container."""
-        return self.client.oci_execute(container_uuid, args, environ)
-
-    def delete(self, container_uuid, kill=False):
-        """Delete the container."""
-        self.client.oci_delete(container_uuid, kill)
-
-
 class SingularityUserRuntime(ContainerRuntime):
 
     """Implements the container runtime interface using the singularity
@@ -289,21 +266,20 @@ class SingularityUserRuntime(ContainerRuntime):
         """Creates the client for singularity, with an optional custom
         path/command."""
         self.client = SingularityClient(singularity_path=path)
-        self.containers = dict()
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         """Uses the container resource allocation to create a container."""
-        self.containers[container.uuid] = container
+        imageinfo = container.manifest.image
+        self.client.instance_start(container.uuid, imageinfo.path,
+                                   [downstream_uri])
 
     def execute(self, container_uuid, args, environ):
         """Launches a command in the container."""
-        imageinfo = self.containers[container_uuid].manifest.image
-        # not checking image because singularity supports all types
-        return self.client.execute(imageinfo.path, args, environ)
+        return self.client.execute(container_uuid, args, environ)
 
     def delete(self, container_uuid, kill=False):
         """Delete the container."""
-        del self.containers[container_uuid]
+        self.client.instance_stop(container_uuid, kill)
 
 
 class DummyRuntime(ContainerRuntime):
@@ -314,7 +290,7 @@ class DummyRuntime(ContainerRuntime):
     def __init__(self):
         pass
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         pass
 
     def execute(self, container_uuid, args, environ):
