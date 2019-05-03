@@ -141,6 +141,57 @@ class NodeOSClient(object):
                                   cwd=environ['PWD'])
 
 
+class SingularityClient(object):
+
+    """Client to singularity."""
+
+    def __init__(self, singularity_path="singularity"):
+        """Load client configuration."""
+        self.prefix = singularity_path
+
+    def instance_start(self, instance_name, container_image, bind_list=[]):
+        """Start a named instance of a container image.
+
+        Note that singularity will also start the startscript if
+        defined in the container image, which might be an issue."""
+        args = [self.prefix]
+        args.extend(['instance', 'start'])
+        if bind_list:
+            args.extend(['--bind', ','.join(bind_list)])
+        args.extend([container_image, instance_name])
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        logpopen(p, args, stdout, stderr)
+
+    def execute(self, instance_name, argv, environ):
+        """Execute argv inside container.
+
+        singularity exec instance://instance_name <command>"""
+        args = [self.prefix]  # singularity
+        container_name = "instance://" + instance_name
+        args.extend(['exec', container_name])
+        args.extend(argv)
+        return process.Subprocess(args, env=environ,
+                                  stdout=process.Subprocess.STREAM,
+                                  stderr=process.Subprocess.STREAM,
+                                  close_fds=True,
+                                  cwd=environ['PWD'])
+
+    def instance_stop(self, instance_name, kill=False):
+        """Stop an instance and kill everything in it."""
+
+        args = [self.prefix]
+        args.extend(['instance', 'stop'])
+        if kill:
+            args.append("--force")
+        args.append(instance_name)
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        logpopen(p, args, stdout, stderr)
+
+
 class ChrtClient(object):
 
     """Client to chrt command line wrapper."""

@@ -13,7 +13,7 @@ from __future__ import print_function
 from aci import ImageManifest
 from collections import namedtuple
 import logging
-from subprograms import ChrtClient, NodeOSClient, resources
+from subprograms import ChrtClient, NodeOSClient, resources, SingularityClient
 import operator
 
 logger = logging.getLogger('nrm')
@@ -30,7 +30,8 @@ class ContainerManager(object):
     def __init__(self, container_runtime, rm,
                  perfwrapper="nrm-perfwrapper",
                  linuxperf="perf",
-                 pmpi_lib="/usr/lib/libnrm-pmpi.so"):
+                 pmpi_lib="/usr/lib/libnrm-pmpi.so",
+                 downstream_event_uri="ipc:///tmp/nrm-downstream-event"):
         self.linuxperf = linuxperf
         self.perfwrapper = perfwrapper
         self.runtime = container_runtime
@@ -40,6 +41,7 @@ class ContainerManager(object):
         self.hwloc = rm.hwloc
         self.chrt = ChrtClient()
         self.pmpi_lib = pmpi_lib
+        self.downstream_event_uri = downstream_event_uri
 
     def _get_container_tuple(self, container_name, manifest):
         """Retrieve a container tuple if the container exists, otherwise use
@@ -110,7 +112,7 @@ class ContainerManager(object):
                                                                manifest)
         if creation_needed:
             logger.info("Creating container %s", container_name)
-            self.runtime.create(container)
+            self.runtime.create(container, self.downstream_event_uri)
             self.containers[container_name] = container
 
         # build context to execute
@@ -132,6 +134,11 @@ class ContainerManager(object):
         if manifest.is_feature_enabled('monitoring'):
             environ['ARGO_NRM_RATELIMIT'] = \
                     manifest.app.isolators.monitoring.ratelimit
+
+        if container.power.get('policy') or \
+                manifest.is_feature_enabled('monitoring'):
+            environ['ARGO_NRM_DOWNSTREAM_EVENT_URI'] = \
+                    self.downstream_event_uri
 
         # build prefix to the entire command based on enabled features
         argv = []
@@ -210,7 +217,7 @@ class ContainerRuntime(object):
     def __init__(self):
         pass
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         """Create the container defined by the container namedtuple on the
         system."""
         raise NotImplementedError
@@ -237,7 +244,7 @@ class NodeOSRuntime(ContainerRuntime):
         path/command."""
         self.client = NodeOSClient(argo_nodeos_config=path)
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         """Uses the container resource allocation to create a container."""
         self.client.create(container.uuid, container.resources)
 
@@ -250,6 +257,31 @@ class NodeOSRuntime(ContainerRuntime):
         self.client.delete(container_uuid, kill)
 
 
+class SingularityUserRuntime(ContainerRuntime):
+
+    """Implements the container runtime interface using the singularity
+    subprogram."""
+
+    def __init__(self, path="singularity"):
+        """Creates the client for singularity, with an optional custom
+        path/command."""
+        self.client = SingularityClient(singularity_path=path)
+
+    def create(self, container, downstream_uri):
+        """Uses the container resource allocation to create a container."""
+        imageinfo = container.manifest.image
+        self.client.instance_start(container.uuid, imageinfo.path,
+                                   [downstream_uri])
+
+    def execute(self, container_uuid, args, environ):
+        """Launches a command in the container."""
+        return self.client.execute(container_uuid, args, environ)
+
+    def delete(self, container_uuid, kill=False):
+        """Delete the container."""
+        self.client.instance_stop(container_uuid, kill)
+
+
 class DummyRuntime(ContainerRuntime):
 
     """Implements a dummy runtime that doesn't create any container, but still
@@ -258,7 +290,7 @@ class DummyRuntime(ContainerRuntime):
     def __init__(self):
         pass
 
-    def create(self, container):
+    def create(self, container, downstream_uri):
         pass
 
     def execute(self, container_uuid, args, environ):
