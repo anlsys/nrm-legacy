@@ -1,2 +1,2 @@
 include Makefile
-include tox.ini
+include nrm/schemas/*.json

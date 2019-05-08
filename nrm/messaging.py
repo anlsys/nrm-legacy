@@ -8,164 +8,81 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###############################################################################
 
-from collections import namedtuple
 import json
 import logging
 import uuid
 import zmq
+import os
 import zmq.utils
 import zmq.utils.monitor
 from zmq.eventloop import zmqstream
-
-# basestring support
-try:
-    basestring
-except NameError:
-    basestring = str
-
-logger = logging.getLogger('nrm')
-
-# list of APIs supported by this messaging layer. Each message is
-# indexed by its intended api user and the type of the message, along with
-# basic field type information.
-APIS = ['up_rpc_req', 'up_rpc_rep', 'up_pub', 'down_event']
-MSGFORMATS = {k: {} for k in APIS}
-
-MSGFORMATS['up_rpc_req'] = {
-        'list':                 {},
-        'run':                  {
-            'manifest':         basestring,
-            'path':             basestring,
-            'args':             list,
-            'container_uuid':   basestring,
-            'environ':          dict
-            },
-        'kill':                 {
-            'container_uuid':   basestring
-            },
-        'setpower':             {
-            'limit':            basestring
-            }
-        }
-
-MSGFORMATS['up_rpc_rep'] = {
-        'list':                 {
-            'payload':          list
-            },
-        'stdout':               {
-            'container_uuid':   basestring,
-            'payload':          basestring
-            },
-        'stderr':               {
-            'container_uuid':   basestring,
-            'payload':          basestring
-            },
-        'process_start':        {
-            'container_uuid':   basestring,
-            'pid':              int
-            },
-        'process_exit':         {
-            'container_uuid':   basestring,
-            'status':           basestring
-            },
-        'getpower':             {
-            'limit':            basestring
-            }
-        }
-
-MSGFORMATS['up_pub'] = {
-        'power':                {
-            'total':            float,
-            'limit':            float
-            },
-        'container_start':      {
-            'container_uuid':   basestring,
-            'errno':            int,
-            'power':            basestring
-            },
-        'container_exit':       {
-            'container_uuid':   basestring,
-            'profile_data':     dict
-            },
-        'performance':          {
-            'container_uuid':   basestring,
-            'payload':          int
-            },
-        'progress':             {
-            'application_uuid': basestring,
-            'payload':          int
-            }
-        }
-
-MSGFORMATS['down_event'] = {
-        'application_start':    {
-            'container_uuid':   basestring,
-            'application_uuid': basestring
-            },
-        'application_exit':     {
-            'application_uuid': basestring
-            },
-        'performance':          {
-            'container_uuid':   basestring,
-            'application_uuid': basestring,
-            'payload':          int,
-            },
-        'progress':             {
-            'application_uuid': basestring,
-            'payload':          int
-            },
-        'phase_context':        {
-            'cpu':              int,
-            'startcompute':     int,
-            'endcompute':       int,
-            'startbarrier':     int,
-            'endbarrier':       int
-            }
-        }
-
-# Mirror of the message formats, using namedtuples as the actual transport
-# for users of this messaging layer.
-MSGTYPES = {k: {} for k in APIS}
-for api, types in MSGFORMATS.items():
-    tname = "msg_{}_".format(api)
-    MSGTYPES[api] = {k: namedtuple(tname+k, sorted(['api', 'type'] + v.keys()))
-                     for k, v in types.items()}
+import warlock
+from jsonschema import Draft4Validator
 
 
-def wire2msg(wire_msg):
-    """Convert the wire format into a msg from the available MSGTYPES."""
-    fields = json.loads(wire_msg)
-    assert 'api' in fields
-    api = fields['api']
-    assert api in MSGFORMATS
-    valid_types = MSGFORMATS[api]
-    assert 'type' in fields
-    mtype = fields['type']
-    assert mtype in valid_types
-    # format check
-    fmt = valid_types[mtype]
-    for key in fields:
-        if key in ['api', 'type']:
-            continue
-        assert key in fmt, "%r missing from %r" % (key, fmt)
-        assert isinstance(fields[key], fmt[key]), \
-            "type mismatch for %r: %r != %r" % (key, fields[key], fmt[key])
-    for key in fmt:
-        assert key in fields, "%r missing from %r" % (key, fields)
-        assert isinstance(fields[key], fmt[key]), \
-            "type mismatch for %r: %r != %r" % (key, fields[key], fmt[key])
-
-    mtuple = MSGTYPES[api][mtype]
-    return mtuple(**fields)
+_logger = logging.getLogger('nrm')
 
 
-def msg2wire(msg):
-    """Convert a message to its wire format (dict)."""
-    fields = msg._asdict()
-    return json.dumps(fields)
+def _loadschema(api):
+    sourcedir = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(sourcedir, "schemas", api+".json")) as f:
+        s = json.load(f)
+        Draft4Validator.check_schema(s)
+        return(warlock.model_factory(s))
 
 
-class UpstreamRPCClient(object):
+_UpstreamRep = _loadschema('upstreamRep')
+_UpstreamPub = _loadschema('upstreamPub')
+
+
+def send(apiname):
+    def wrap(cls):
+        model = _loadschema(apiname)
+
+        def send(self, *args, **kwargs):
+            self.socket.send(
+                    json.dumps(model(dict(*args, **kwargs))))
+        setattr(cls, "send", send)
+
+        return(cls)
+    return(wrap)
+
+
+def recv_callback(apiname):
+    def wrap(cls):
+        model = _loadschema(apiname)
+
+        def recv(self):
+            """Receives a response to a message."""
+            wire = self.socket.recv()
+            _logger.debug("received message: %r", wire)
+            return model(json.loads(wire))
+
+        def do_recv_callback(self, frames):
+            """Receives a message from zmqstream.on_recv, passing it to a user
+            callback."""
+            _logger.info("receiving message: %r", frames)
+            assert len(frames) == 2
+            print(frames)
+            msg = model(json.loads(frames[1]))
+            assert self.callback
+            self.callback(msg, str(frames[0]))
+
+        def setup_recv_callback(self, callback):
+            """Setup a ioloop-backed callback for receiving messages."""
+            self.stream = zmqstream.ZMQStream(self.socket)
+            self.callback = callback
+            self.stream.on_recv(self.do_recv_callback)
+
+        setattr(cls, "recv", recv)
+        setattr(cls, "do_recv_callback", do_recv_callback)
+        setattr(cls, "setup_recv_callback", setup_recv_callback)
+
+        return(cls)
+    return(wrap)
+
+
+class RPCClient(object):
 
     """Implements the message layer client to the upstream RPC API."""
 
@@ -184,24 +101,14 @@ class UpstreamRPCClient(object):
         self.socket.connect(self.address)
         while wait:
             msg = zmq.utils.monitor.recv_monitor_message(monitor)
-            logger.debug("monitor message: %r", msg)
+            _logger.debug("monitor message: %r", msg)
             if int(msg['event']) == zmq.EVENT_CONNECTED:
-                logger.debug("socket connected")
+                _logger.debug("socket connected")
                 break
         self.socket.disable_monitor()
 
-    def sendmsg(self, msg):
-        """Sends a message, including the client uuid as the identity."""
-        self.socket.send(msg2wire(msg))
 
-    def recvmsg(self):
-        """Receives a message."""
-        wire = self.socket.recv()
-        logger.debug("received message: %r", wire)
-        return wire2msg(wire)
-
-
-class UpstreamRPCServer(object):
+class RPCServer(object):
 
     """Implements the message layer server to the upstream RPC API."""
 
@@ -213,35 +120,32 @@ class UpstreamRPCServer(object):
         self.socket.setsockopt(zmq.RCVHWM, 0)
         self.socket.bind(address)
 
-    def recvmsg(self):
-        """Receives a message and returns it along with the client identity."""
-        frames = self.socket.recv_multipart()
-        logger.debug("received message: %r", frames)
-        assert len(frames) == 2
-        msg = wire2msg(frames[1])
-        return msg, str(frames[0])
 
-    def do_recv_callback(self, frames):
-        """Receives a message from zmqstream.on_recv, passing it to a user
-        callback."""
-        logger.info("receiving message: %r", frames)
-        assert len(frames) == 2
-        msg = wire2msg(frames[1])
-        assert self.callback
-        self.callback(msg, str(frames[0]))
+@send("upstreamReq")
+class UpstreamRPCClient(RPCClient):
 
-    def sendmsg(self, msg, client_uuid):
+    """Implements the message layer client to the upstream RPC API."""
+
+    def recv(self):
+        """Receives a response to a message."""
+        wire = self.socket.recv()
+        _logger.debug("received message: %r", wire)
+        return _UpstreamRep(json.loads(wire))
+
+
+@recv_callback("upstreamReq")
+class UpstreamRPCServer(RPCServer):
+
+    """Implements the message layer server to the upstream RPC API."""
+
+    def send(self, client_uuid, *args, **kwargs):
         """Sends a message to the identified client."""
-        logger.debug("sending message: %r to client: %r", msg, client_uuid)
-        self.socket.send_multipart([client_uuid, msg2wire(msg)])
-
-    def setup_recv_callback(self, callback):
-        """Setup a ioloop-backed callback for receiving messages."""
-        self.stream = zmqstream.ZMQStream(self.socket)
-        self.callback = callback
-        self.stream.on_recv(self.do_recv_callback)
+        msg = json.dumps(_UpstreamRep(dict(*args, **kwargs)))
+        _logger.debug("sending message: %r to client: %r", msg, client_uuid)
+        self.socket.send_multipart([client_uuid, msg])
 
 
+@send("upstreamPub")
 class UpstreamPubServer(object):
 
     """Implements the message layer server for the upstream PUB/SUB API."""
@@ -253,11 +157,6 @@ class UpstreamPubServer(object):
         self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.setsockopt(zmq.SNDHWM, 0)
         self.socket.bind(address)
-
-    def sendmsg(self, msg):
-        """Sends a message."""
-        logger.debug("sending message: %r", msg)
-        self.socket.send(msg2wire(msg))
 
 
 class UpstreamPubClient(object):
@@ -277,27 +176,26 @@ class UpstreamPubClient(object):
         self.socket.connect(self.address)
         while wait:
             msg = zmq.utils.monitor.recv_monitor_message(monitor)
-            logger.debug("monitor message: %r", msg)
+            _logger.debug("monitor message: %r", msg)
             if int(msg['event']) == zmq.EVENT_CONNECTED:
-                logger.debug("socket connected")
+                _logger.debug("socket connected")
                 break
         self.socket.disable_monitor()
 
-    def recvmsg(self):
+    def recv(self):
         """Receives a message and returns it."""
         frames = self.socket.recv_multipart()
-        logger.debug("received message: %r", frames)
+        _logger.debug("received message: %r", frames)
         assert len(frames) == 1
-        return wire2msg(frames[0])
+        return _UpstreamPub(json.loads(frames[0]))
 
     def do_recv_callback(self, frames):
         """Receives a message from zmqstream.on_recv, passing it to a user
         callback."""
-        logger.info("receiving message: %r", frames)
+        _logger.info("receiving message: %r", frames)
         assert len(frames) == 1
-        msg = wire2msg(frames[0])
         assert self.callback
-        self.callback(msg)
+        self.callback(_UpstreamPub(json.loads(frames[0])))
 
     def setup_recv_callback(self, callback):
         """Setup a ioloop-backed callback for receiving messages."""
@@ -306,18 +204,15 @@ class UpstreamPubClient(object):
         self.stream.on_recv(self.do_recv_callback)
 
 
-class DownstreamEventServer(UpstreamRPCServer):
+@recv_callback("downstreamEvent")
+class DownstreamEventServer(RPCServer):
+    pass
 
     """Implements the message layer server for the downstream event API."""
 
-    def sendmsg(self, msg, client_uuid):
-        assert False, "Cannot send message from this side of the event stream."
 
-
-class DownstreamEventClient(UpstreamRPCClient):
+@send("downstreamEvent")
+class DownstreamEventClient(RPCClient):
+    pass
 
     """Implements the message layer client for the downstream event API."""
-
-    def recvmsg(self):
-        assert False, \
-            "Cannot receive messages from this side of the event stream."

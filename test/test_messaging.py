@@ -80,12 +80,12 @@ def test_rpc_connection(upstream_rpc_client, upstream_rpc_server):
 
 
 def test_rpc_send_recv(upstream_rpc_client, upstream_rpc_server, dummy_msg):
-    upstream_rpc_client.sendmsg(dummy_msg)
-    msg, client = upstream_rpc_server.recvmsg()
+    upstream_rpc_client.send(dummy_msg)
+    msg, client = upstream_rpc_server.recv()
     assert msg == dummy_msg
     assert client == upstream_rpc_client.uuid
-    upstream_rpc_server.sendmsg(dummy_msg, client)
-    msg = upstream_rpc_client.recvmsg()
+    upstream_rpc_server.send(dummy_msg, client)
+    msg = upstream_rpc_client.recv()
     assert msg == dummy_msg
 
 
@@ -100,7 +100,7 @@ def test_rpc_server_callback(upstream_rpc_client, upstream_rpc_server,
 
 
 def test_pub_server_send(upstream_pub_server, dummy_msg):
-    upstream_pub_server.sendmsg(dummy_msg)
+    upstream_pub_server.send(dummy_msg)
 
 
 def test_pub_connection(upstream_pub_client, upstream_pub_server):
@@ -108,8 +108,8 @@ def test_pub_connection(upstream_pub_client, upstream_pub_server):
 
 
 def test_pub_client_recv(upstream_pub_server, upstream_pub_client, dummy_msg):
-    upstream_pub_server.sendmsg(dummy_msg)
-    msg = upstream_pub_client.recvmsg()
+    upstream_pub_server.send(dummy_msg)
+    msg = upstream_pub_client.recv()
     assert msg == dummy_msg
 
 
@@ -119,8 +119,8 @@ def test_down_connection(downstream_event_client, downstream_event_server):
 
 def test_down_event_send_recv(downstream_event_client, downstream_event_server,
                               dummy_msg):
-    downstream_event_client.sendmsg(dummy_msg)
-    msg, client = downstream_event_server.recvmsg()
+    downstream_event_client.send(dummy_msg)
+    msg, client = downstream_event_server.recv()
     assert msg == dummy_msg
     assert client == downstream_event_client.uuid
 
