@@ -1,6 +1,6 @@
 ---
 variables:
-  ARGOPKGS: "https://xgitlab.cels.anl.gov/argo/argopkgs/-/archive/nrm-gen/argopkgs-nrm-gen.tar.gz"
+  ARGOPKGS: "https://xgitlab.cels.anl.gov/argo/argopkgs/-/archive/master/argopkgs-master.tar.gz"
   EXTRA: "--nrm ./."
 
 stages:
@@ -11,11 +11,11 @@ stages:
   - quality
 
 include:
-  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/nrm-gen/gitlab-ci/argonix.yml
-  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/nrm-gen/gitlab-ci/components.yml
-  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/nrm-gen/gitlab-ci/integration.yml
-  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/nrm-gen/gitlab-ci/applications.yml
-  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/nrm-gen/gitlab-ci/repoquality.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/argonix.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/components.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/integration.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/applications.yml
+  - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/repoquality.yml
 
 py.test:
   stage: test
