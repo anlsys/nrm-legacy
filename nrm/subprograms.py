@@ -159,6 +159,7 @@ class SingularityClient(object):
         if bind_list:
             args.extend(['--bind', ','.join(bind_list)])
         args.extend([container_image, instance_name])
+        logger.error("launching singularity command: %s", args)
         p = subprocess.Popen(args, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()

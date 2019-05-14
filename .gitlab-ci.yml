@@ -17,14 +17,6 @@ include:
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/applications.yml
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/repoquality.yml
 
-py.test:
-  stage: test
-  script:
-    - pipenv install --dev
-    - pipenv run py.test --deselect=test/test_messaging.py
-  tags:
-    - rapl
-
 flake8:
   stage: style
   script:

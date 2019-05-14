@@ -11,6 +11,7 @@
 from __future__ import print_function
 
 from aci import ImageManifest
+from json import load
 from collections import namedtuple
 import logging
 from subprograms import ChrtClient, NodeOSClient, resources, SingularityClient
@@ -54,8 +55,8 @@ class ContainerManager(object):
             return (False, self.containers[container_name])
 
         # ask the resource manager for resources
-        ncpus = int(manifest.app.isolators.container.cpus.value)
-        nmems = int(manifest.app.isolators.container.mems.value)
+        ncpus = manifest.app['container']['cpus']
+        nmems = manifest.app['container']['mems']
         req = resources(ncpus, nmems)
         allocated = self.resourcemanager.schedule(container_name, req)
         logger.info("create: allocation: %r", allocated)
@@ -69,15 +70,15 @@ class ContainerManager(object):
         container_power['manager'] = None
 
         if manifest.is_feature_enabled('power'):
-            pp = manifest.app.isolators.power
-            if pp.profile in ["1", "True"]:
+            pp = manifest.app['power']
+            if pp['profile'] is True:
                 container_power['profile'] = dict()
                 container_power['profile']['start'] = dict()
                 container_power['profile']['end'] = dict()
-            if pp.policy != "NONE":
-                container_power['policy'] = pp.policy
-                container_power['damper'] = pp.damper
-                container_power['slowdown'] = pp.slowdown
+            if pp['policy'] != "NONE":
+                container_power['policy'] = pp['policy']
+                container_power['damper'] = pp['damper']
+                container_power['slowdown'] = pp['slowdown']
 
         # Compute hardware bindings
         hwbindings = dict()
@@ -103,10 +104,12 @@ class ContainerManager(object):
         logger.info("create: args:           %r", args)
         logger.info("create: container name: %s", container_name)
 
-        manifest = ImageManifest()
-        if not manifest.load(manifestfile):
-            logger.error("Manifest is invalid")
-            return None
+        try:
+            with open(manifestfile) as f:
+                manifest = ImageManifest((load(f)))
+        except Exception as e:
+            logger.error("error occured in manifest loading:")
+            raise(e)
 
         creation_needed, container = self._get_container_tuple(container_name,
                                                                manifest)
@@ -120,7 +123,7 @@ class ContainerManager(object):
         #                   "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
         environ['ARGO_CONTAINER_UUID'] = container_name
         environ['PERF'] = self.linuxperf
-        environ['AC_APP_NAME'] = manifest.name
+        environ['AC_APP_NAME'] = manifest['name']
         environ['AC_METADATA_URL'] = "localhost"
 
         # power profiling uses LD_PRELOAD, we use get to ensure that it
@@ -133,7 +136,7 @@ class ContainerManager(object):
         # monitoring section involves libnrm
         if manifest.is_feature_enabled('monitoring'):
             environ['ARGO_NRM_RATELIMIT'] = \
-                    manifest.app.isolators.monitoring.ratelimit
+                    manifest.app['monitoring']['ratelimit']
 
         if container.power.get('policy') or \
                 manifest.is_feature_enabled('monitoring'):
@@ -143,7 +146,7 @@ class ContainerManager(object):
         # build prefix to the entire command based on enabled features
         argv = []
         if manifest.is_feature_enabled('scheduler'):
-            sched = manifest.app.isolators.scheduler
+            sched = manifest.app['scheduler']
             argv = self.chrt.getwrappedcmd(sched)
 
         # Use hwloc-bind to launch each process in the conatiner by prepending
@@ -270,8 +273,8 @@ class SingularityUserRuntime(ContainerRuntime):
     def create(self, container, downstream_uri):
         """Uses the container resource allocation to create a container."""
         imageinfo = container.manifest.image
-        self.client.instance_start(container.uuid, imageinfo.path,
-                                   [downstream_uri])
+        self.client.instance_start(container.uuid, imageinfo['path'],
+                                   [downstream_uri]+imageinfo['binds'])
 
     def execute(self, container_uuid, args, environ):
         """Launches a command in the container."""
