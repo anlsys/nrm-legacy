@@ -9,6 +9,8 @@ six = "==1.11.0"
 pyzmq = "*"
 tornado = "*"
 numpy = "*"
+warlock = "*"
+scipy = "*"
 argparse = "*"
 
 [dev-packages]

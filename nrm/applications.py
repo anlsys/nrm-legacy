@@ -91,8 +91,8 @@ class ApplicationManager(object):
     def register(self, msg, container):
         """Register a new downstream application."""
 
-        uuid = msg.application_uuid
-        container_uuid = msg.container_uuid
+        uuid = msg['application_uuid']
+        container_uuid = msg['container_uuid']
         progress = 0
         threads = False
         phase_contexts = dict()

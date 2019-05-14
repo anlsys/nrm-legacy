@@ -19,11 +19,8 @@ import nrm.messaging
 import uuid
 import sys
 import time
-import collections
 
-RPC_MSG = nrm.messaging.MSGTYPES['up_rpc_req']
 logger = logging.getLogger('nrm')
-KillArgs = collections.namedtuple("Kill", ["uuid"])
 
 
 class CommandLineInterface(object):
@@ -37,12 +34,9 @@ class CommandLineInterface(object):
         if uuid:
             logger.info("received signal %d, killing the application..",
                         signum)
-            command = {'api': 'up_rpc_req',
-                       'type': 'kill',
-                       'container_uuid': uuid
-                       }
-            msg = RPC_MSG['kill'](**command)
-            self.client.sendmsg(msg)
+            self.client.send(
+                    "Kill",
+                    container_uuid=uuid)
             logger.info("killed the application, exiting.")
         else:
             logger.info("received signal %d, exiting", signum)
@@ -70,33 +64,26 @@ class CommandLineInterface(object):
         self.pub_client.connect()
 
         while(True):
-            msg = self.pub_client.recvmsg()
+            msg = self.pub_client.recv()
             logger.debug("pub message: %s", msg)
 
             def print_if_filter():
                 if argv.filter:
-                    if argv.filter == msg.type:
-                        if (msg.type == "performance" or
-                           msg.type == "progress"):
-                            print("%s, %s, %s" % (msg.type, time.time(),
+                    if argv.filter == msg.tag:
+                        if (msg.tag == "performance" or
+                           msg.tag == "progress"):
+                            print("%s, %s, %s" % (msg.tag, time.time(),
                                                   msg.payload))
-                        if msg.type == "power":
-                            print("%s, %s, %s" % (msg.type, time.time(),
+                        if msg.tag == "power":
+                            print("%s, %s, %s" % (msg.tag, time.time(),
                                                   msg.total))
-                        if msg.type == "container_exit":
-                            print("%s, %s, %s" % (msg.type, time.time(),
+                        if msg.tag == "exit":
+                            print("%s, %s, %s" % (msg.tag, time.time(),
                                                   msg.profile_data))
                 else:
-                    print("%s, %s" % (msg.type, time.time()))
+                    print("%s, %s" % (msg.tag, time.time()))
                 sys.stdout.flush()
-
             print_if_filter()
-            # if argv.uuid:
-            #     uuid = getattr(msg, 'container_uuid', None)
-            #     if argv.uuid == uuid or msg.type == "power":
-            #         print_if_filter()
-            # else:
-            #     print_if_filter()
 
     def do_run(self, argv):
         """ Connect to the NRM and ask to spawn a container and run a command
@@ -108,6 +95,7 @@ class CommandLineInterface(object):
         # the command a container uuid as a way to make sure that we can make
         # the command idempotent.
         environ = os.environ
+        # environ = []
         container_uuid = argv.ucontainername or str(uuid.uuid4())
 
         # simple check + error msg + non-zero return code
@@ -118,26 +106,22 @@ class CommandLineInterface(object):
                 logger.error("Manifest file not found: %s", path)
                 sys.exit(1)
 
-        command = {'api': 'up_rpc_req',
-                   'type': 'run',
-                   'manifest': sanitize_manifest(argv.manifest),
-                   'path': argv.command,
-                   'args': argv.args,
-                   'environ': dict(environ),
-                   'container_uuid': container_uuid,
-                   }
-        msg = RPC_MSG['run'](**command)
         # command fsm
         state = 'init'
         outeof = False
         erreof = False
         exitmsg = None
-        self.client.sendmsg(msg)
+        self.client.send(
+                tag="run",
+                manifest=sanitize_manifest(argv.manifest),
+                path=argv.command,
+                args=argv.args,
+                environ=dict(environ),
+                container_uuid=container_uuid)
 
         # the first message tells us if we started a container or not
-        msg = self.client.recvmsg()
-        assert msg.api == 'up_rpc_rep'
-        assert msg.type == 'process_start'
+        msg = self.client.recv()
+        assert msg.tag == 'start'
 
         def handler(signum, frame):
             self.do_signal(msg.container_uuid, signum, frame)
@@ -145,25 +129,24 @@ class CommandLineInterface(object):
 
         state = 'started'
         while(True):
-            msg = self.client.recvmsg()
-            assert msg.api == 'up_rpc_rep'
-            assert msg.type in ['stdout', 'stderr', 'exit', 'process_exit']
+            msg = self.client.recv()
+            assert msg.tag in ['stdout', 'stderr', 'exit']
 
-            if msg.type == 'stdout':
+            if msg.tag == 'stdout':
                 logger.debug("container msg: %r", msg)
                 if msg.payload == 'eof':
                     outeof = True
                 else:
-                    print(msg.payload)
+                    print(msg.payload, file=sys.stdout)
                     sys.stdout.flush()
-            elif msg.type == 'stderr':
+            elif msg.tag == 'stderr':
                 logger.debug("container msg: %r", msg)
                 if msg.payload == 'eof':
                     erreof = True
                 else:
                     print(msg.payload, file=sys.stderr)
-                    sys.stdout.flush()
-            elif msg.type == 'process_exit':
+                    sys.stderr.flush()
+            elif msg.tag == 'exit':
                 logger.info("process ended: %r", msg)
                 state = 'exiting'
                 exitmsg = msg
@@ -197,13 +180,9 @@ class CommandLineInterface(object):
         The NRM should respond to us with one message listing all
         containers."""
 
-        command = {'api': 'up_rpc_req',
-                   'type': 'list'}
-        msg = RPC_MSG['list'](**command)
-        self.client.sendmsg(msg)
-        msg = self.client.recvmsg()
-        assert msg.api == 'up_rpc_rep'
-        assert msg.type == 'list'
+        self.client.send(tag="list")
+        msg = self.client.recv()
+        assert msg.tag == 'list'
         logger.info("list response: %r", msg)
 
     def do_kill(self, argv):
@@ -212,15 +191,9 @@ class CommandLineInterface(object):
         The NRM should respond to us with a message containing the exit status
         of the top process of the container."""
 
-        command = {'api': 'up_rpc_req',
-                   'type': 'kill',
-                   'container_uuid': argv.uuid
-                   }
-        msg = RPC_MSG['kill'](**command)
-        self.client.sendmsg(msg)
-        msg = self.client.recvmsg()
-        assert msg.api == 'up_rpc_rep'
-        assert msg.type == 'exit'
+        self.client.send(tag="kill", container_uuid=argv.uuid)
+        msg = self.client.recv()
+        assert msg.tag == 'exit'
         logger.info("container exit: %r", msg)
 
     def do_setpower(self, argv):
@@ -233,15 +206,9 @@ class CommandLineInterface(object):
         # timely answer.
         # TODO: check that the level makes a little bit of sense in the first
         # place
-        command = {'api': 'up_rpc_req',
-                   'type': 'setpower',
-                   'limit': str(argv.limit),
-                   }
-        msg = RPC_MSG['setpower'](**command)
-        self.client.sendmsg(msg)
-        msg = self.client.recvmsg()
-        assert msg.api == 'up_rpc_rep'
-        assert msg.type == 'getpower'
+        self.client.send(tag="setPower", limit=str(argv.limit))
+        msg = self.client.recv()
+        assert msg.tag == 'getPower'
         logger.info("command received by the daemon: %r", msg)
 
     def main(self):

@@ -20,7 +20,6 @@ import subprocess
 import uuid
 from nrm import messaging
 
-PUB_MSG = messaging.MSGTYPES['down_event']
 logger = logging.getLogger('perf-wrapper')
 
 
@@ -33,26 +32,19 @@ class PerfWrapper(object):
         pass
 
     def shutdown(self):
-        update = {'api': 'down_event',
-                  'type': 'application_exit',
-                  'application_uuid': self.app_uuid,
-                  }
-        msg = PUB_MSG['application_exit'](**update)
-        self.downstream_event.sendmsg(msg)
+        self.downstream_event.send(tag="exit", application_uuid=self.app_uuid)
 
     def performance_report(self, performance):
-        update = {'api': 'down_event',
-                  'type': 'performance',
-                  'payload': performance,
-                  'container_uuid': self.container_uuid,
-                  'application_uuid': self.app_uuid,
-                  }
-        msg = PUB_MSG['performance'](**update)
-        self.downstream_event.sendmsg(msg)
+        self.downstream_event.send(
+                tag="performance",
+                payload=performance,
+                container_uuid=self.container_uuid,
+                application_uuid=self.app_uuid)
 
     def setup(self):
         downstream_url = "ipc:///tmp/nrm-downstream-event"
         self.downstream_event = messaging.DownstreamEventClient(downstream_url)
+        logger.info("connecting downstream pub")
         self.downstream_event.connect()
         logger.info("downstream pub socket connected to: %s", downstream_url)
 
@@ -64,13 +56,10 @@ class PerfWrapper(object):
         self.app_uuid = str(uuid.uuid4())
         logger.info("client uuid: %r", self.app_uuid)
         # send an hello to the demon
-        update = {'api': 'down_event',
-                  'type': 'application_start',
-                  'container_uuid': self.container_uuid,
-                  'application_uuid': self.app_uuid,
-                  }
-        msg = PUB_MSG['application_start'](**update)
-        self.downstream_event.sendmsg(msg)
+        self.downstream_event.send(
+                tag="start",
+                container_uuid=self.container_uuid,
+                application_uuid=self.app_uuid)
 
     def main(self):
         parser = argparse.ArgumentParser()

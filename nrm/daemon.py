@@ -21,12 +21,8 @@ from resources import ResourceManager
 from sensor import SensorManager
 import signal
 from zmq.eventloop import ioloop
-from nrm.messaging import MSGTYPES
 from nrm.messaging import UpstreamRPCServer, UpstreamPubServer, \
         DownstreamEventServer
-
-RPC_MSG = MSGTYPES['up_rpc_rep']
-PUB_MSG = MSGTYPES['up_pub']
 
 logger = logging.getLogger('nrm')
 
@@ -37,71 +33,66 @@ class Daemon(object):
         self.target = 100.0
         self.config = config
 
-    def do_downstream_receive(self, msg, client):
-        logger.info("receiving downstream message: %r", msg)
-        if msg.type == 'application_start':
-            cid = msg.container_uuid
+    def do_downstream_receive(self, event, client):
+        logger.info("receiving downstream message: %r", event)
+        if event.tag == 'start':
+            cid = event.container_uuid
             container = self.container_manager.containers[cid]
-            self.application_manager.register(msg, container)
-        elif msg.type == 'progress':
-            if msg.application_uuid in self.application_manager.applications:
+            self.application_manager.register(event, container)
+        elif event.tag == 'progress':
+            if event.application_uuid in self.application_manager.applications:
                 app = self.application_manager.applications[
-                        msg.application_uuid]
-                app.update_performance(msg)
-                pub = {'api': 'up_pub',
-                       'type': 'progress',
-                       'payload': msg.payload,
-                       'application_uuid': msg.application_uuid}
-                self.upstream_pub_server.sendmsg(
-                        PUB_MSG['progress'](**pub))
-        elif msg.type == 'performance':
-            if msg.application_uuid in self.application_manager.applications:
+                        event.application_uuid]
+                app.update_performance(event)
+                # self.upstream_pub_server.send(event) TODO try this.
+                self.upstream_pub_server.send(
+                        tag='progress',
+                        payload=event.payload,
+                        application_uuid=event.application_uuid)
+        elif event.tag == 'performance':
+            if event.application_uuid in self.application_manager.applications:
                 app = self.application_manager.applications[
-                        msg.application_uuid]
-                app.update_performance(msg)
-            pub = {'api': 'up_pub',
-                   'type': 'performance',
-                   'payload': msg.payload,
-                   'container_uuid': msg.container_uuid}
-            self.upstream_pub_server.sendmsg(
-                    PUB_MSG['performance'](**pub))
-        elif msg.type == 'phase_context':
-            uuid = msg.application_uuid
+                        event.application_uuid]
+                app.update_performance(event)
+            self.upstream_pub_server.send(
+                        tag='performance',
+                        payload=event.payload,
+                        container_uuid=event.container_uuid)
+        elif event.tag == 'phasecontext':
+            uuid = event.application_uuid
             if uuid in self.application_manager.applications:
                 app = self.application_manager.applications[uuid]
                 if bool(self.container_manager.containers):
                     cid = app.container_uuid
                     c = self.container_manager.containers[cid]
                     if c.power['policy']:
-                        app.update_phase_context(msg)
+                        app.update_phase_context(event)
                         # Run container policy
                         self.controller.run_policy_container(c, app)
-        elif msg.type == 'application_exit':
-            uuid = msg.application_uuid
+        elif event.tag == 'exit':
+            uuid = event.application_uuid
             if uuid in self.application_manager.applications:
                 self.application_manager.delete(uuid)
         else:
-            logger.error("unknown msg: %r", msg)
+            logger.error("unknown msg: %r", event)
             return
 
-    def do_upstream_receive(self, msg, client):
-        if msg.type == 'setpower':
-            self.target = float(msg.limit)
+    def do_upstream_receive(self, req, client):
+        if req.tag == 'setPower':
+            self.target = float(req.limit)
             logger.info("new target measure: %g", self.target)
-            update = {'api': 'up_rpc_rep',
-                      'type': 'getpower',
-                      'limit': str(self.target)
-                      }
-            self.upstream_rpc_server.sendmsg(RPC_MSG['getpower'](**update),
-                                             client)
-        elif msg.type == 'run':
-            logger.info("asked to run a command in a container: %r", msg)
-            container_uuid = msg.container_uuid
-            params = {'manifest': msg.manifest,
-                      'file': msg.path,
-                      'args': msg.args,
-                      'uuid': msg.container_uuid,
-                      'environ': msg.environ,
+            self.upstream_rpc_server.send(
+                    client,
+                    tag='getPower',
+                    limit=str(self.target))
+        elif req.tag == 'run':
+            logger.info("asked to run a command in a container: %r", req)
+            container_uuid = req.container_uuid
+            params = {'manifest': req.manifest,
+                      'file': req.path,
+                      'args': req.args,
+                      'uuid': req.container_uuid,
+                      'environ': req.environ,
                       'clientid': client,
                       }
             pid, container = self.container_manager.create(params)
@@ -117,23 +108,17 @@ class Daemon(object):
                     p = container.power['profile']
                     p['start'] = self.machine_info['energy']['energy']
                     p['start']['time'] = self.machine_info['time']
-                update = {'api': 'up_pub',
-                          'type': 'container_start',
-                          'container_uuid': container_uuid,
-                          'errno': 0 if container else -1,
-                          'power': container.power['policy'] or str(None)
-                          }
-                self.upstream_pub_server.sendmsg(
-                        PUB_MSG['container_start'](**update))
-
+                self.upstream_pub_server.send(
+                        tag='start',
+                        container_uuid=container_uuid,
+                        errno=0 if container else -1,
+                        power=container.power['policy'] or str(None))
             # now deal with the process itself
-            update = {'api': 'up_rpc_rep',
-                      'type': 'process_start',
-                      'container_uuid': container_uuid,
-                      'pid': pid,
-                      }
-            self.upstream_rpc_server.sendmsg(
-                RPC_MSG['process_start'](**update), client)
+            self.upstream_rpc_server.send(
+                    client,
+                    tag='start',
+                    pid=pid,
+                    container_uuid=container_uuid)
             # setup io callbacks
             outcb = partial(self.do_children_io, client, container_uuid,
                             'stdout')
@@ -141,33 +126,30 @@ class Daemon(object):
                             'stderr')
             container.processes[pid].stdout.read_until_close(outcb, outcb)
             container.processes[pid].stderr.read_until_close(errcb, errcb)
-        elif msg.type == 'kill':
-            logger.info("asked to kill container: %r", msg)
-            response = self.container_manager.kill(msg.container_uuid)
+        elif req.tag == 'kill':
+            logger.info("asked to kill container: %r", req)
+            response = self.container_manager.kill(req.container_uuid)
             # no update here, as it will trigger child exit
-        elif msg.type == 'list':
-            logger.info("asked for container list: %r", msg)
+        elif req.tag == 'list':
+            logger.info("asked for container list: %r", req)
             response = self.container_manager.list()
-            update = {'api': 'up_rpc_rep',
-                      'type': 'list',
-                      'payload': response,
-                      }
-            self.upstream_rpc_server.sendmsg(RPC_MSG['list'](**update),
-                                             client)
+            self.upstream_rpc_server.send(
+                    client,
+                    tag="list",
+                    payload=response)
         else:
-            logger.error("invalid command: %r", msg.type)
+            logger.error("invalid command: %r", req.tag)
 
     def do_children_io(self, client, container_uuid, io, data):
         """Receive data from one of the children, and send it down the pipe.
 
         Meant to be partially defined on a children basis."""
         logger.info("%r received %r data: %r", container_uuid, io, data)
-        update = {'api': 'up_rpc_rep',
-                  'type': io,
-                  'container_uuid': container_uuid,
-                  'payload': data or 'eof',
-                  }
-        self.upstream_rpc_server.sendmsg(RPC_MSG[io](**update), client)
+        self.upstream_rpc_server.send(
+                client,
+                tag=io,
+                container_uuid=container_uuid,
+                payload=data or 'eof')
 
     def do_sensor(self):
         self.machine_info = self.sensor_manager.do_update()
@@ -178,13 +160,10 @@ class Daemon(object):
             logger.error("power sensor format malformed, "
                          "can not report power upstream.")
         else:
-            msg = {'api': 'up_pub',
-                   'type': 'power',
-                   'total': total_power,
-                   'limit': self.target
-                   }
-            self.upstream_pub_server.sendmsg(PUB_MSG['power'](**msg))
-            logger.info("sending sensor message: %r", msg)
+            self.upstream_pub_server.send(
+                    tag="power",
+                    total=total_power,
+                    limit=self.target)
 
     def do_control(self):
         plan = self.controller.planify(self.target, self.machine_info)
@@ -223,13 +202,11 @@ class Daemon(object):
                     clientid = container.clientids[pid]
 
                     # first, send a process_exit
-                    msg = {'api': 'up_rpc_rep',
-                           'type': 'process_exit',
-                           'status': str(status),
-                           'container_uuid': container.uuid,
-                           }
-                    self.upstream_rpc_server.sendmsg(
-                            RPC_MSG['process_exit'](**msg), clientid)
+                    self.upstream_rpc_server.send(
+                            clientid,
+                            tag="exit",
+                            status=str(status),
+                            container_uuid=container.uuid)
                     # Remove the pid of process that is finished
                     container.processes.pop(pid, None)
                     self.container_manager.pids.pop(pid, None)
@@ -240,11 +217,7 @@ class Daemon(object):
                     # kill everything
                     if len(container.processes) == 0:
                         # deal with container exit
-                        msg = {'api': 'up_pub',
-                               'type': 'container_exit',
-                               'container_uuid': container.uuid,
-                               'profile_data': dict(),
-                               }
+                        diff = {}
                         p = container.power
                         if p['policy']:
                             p['manager'].reset_all()
@@ -266,10 +239,11 @@ class Daemon(object):
                             diff['nodename'] = self.sensor_manager.nodename
                             logger.info("Container %r profile data: %r",
                                         container.uuid, diff)
-                            msg['profile_data'] = diff
                         self.container_manager.delete(container.uuid)
-                        self.upstream_pub_server.sendmsg(
-                                PUB_MSG['container_exit'](**msg))
+                        self.upstream_pub_server.send(
+                                tag="exit",
+                                container_uuid=container.uuid,
+                                profile_data=diff)
             else:
                 logger.debug("child update ignored")
                 pass
