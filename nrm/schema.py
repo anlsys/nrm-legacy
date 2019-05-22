@@ -8,16 +8,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###############################################################################
 
-"""Parse and Represent the APPC ACI specification."""
-import logging
-from schema import loadschema
-
-logger = logging.getLogger('nrm')
-
-
-def has(self, f):
-    return(f in self.app.keys())
+import warlock
+import json
+import os
+from jsonschema import Draft4Validator
 
 
-ImageManifest = loadschema("manifest")
-setattr(ImageManifest, "is_feature_enabled", has)
+def loadschema(api):
+    sourcedir = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(sourcedir, "schemas", api+".json")) as f:
+        s = json.load(f)
+        Draft4Validator.check_schema(s)
+        return(warlock.model_factory(s))

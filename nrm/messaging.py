@@ -12,32 +12,20 @@ import json
 import logging
 import uuid
 import zmq
-import os
 import zmq.utils
 import zmq.utils.monitor
 from zmq.eventloop import zmqstream
-import warlock
-from jsonschema import Draft4Validator
+from schema import loadschema
 
 
 _logger = logging.getLogger('nrm')
-
-
-def _loadschema(api):
-    sourcedir = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(sourcedir, "schemas", api+".json")) as f:
-        s = json.load(f)
-        Draft4Validator.check_schema(s)
-        return(warlock.model_factory(s))
-
-
-_UpstreamRep = _loadschema('upstreamRep')
-_UpstreamPub = _loadschema('upstreamPub')
+_UpstreamRep = loadschema('upstreamRep')
+_UpstreamPub = loadschema('upstreamPub')
 
 
 def send(apiname):
     def wrap(cls):
-        model = _loadschema(apiname)
+        model = loadschema(apiname)
 
         def send(self, *args, **kwargs):
             self.socket.send(
@@ -50,7 +38,7 @@ def send(apiname):
 
 def recv_callback(apiname):
     def wrap(cls):
-        model = _loadschema(apiname)
+        model = loadschema(apiname)
 
         def recv(self):
             """Receives a response to a message."""
@@ -63,7 +51,6 @@ def recv_callback(apiname):
             callback."""
             _logger.info("receiving message: %r", frames)
             assert len(frames) == 2
-            print(frames)
             msg = model(json.loads(frames[1]))
             assert self.callback
             self.callback(msg, str(frames[0]))

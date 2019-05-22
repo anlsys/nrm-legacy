@@ -147,7 +147,6 @@ class CommandLineInterface(object):
                     print(msg.payload, file=sys.stderr)
                     sys.stderr.flush()
             elif msg.tag == 'exit':
-                logger.info("process ended: %r", msg)
                 state = 'exiting'
                 exitmsg = msg
             else:
@@ -155,7 +154,7 @@ class CommandLineInterface(object):
             if outeof and erreof and state == 'exiting':
                 state = 'exit'
                 istatus = int(exitmsg.status)
-                logger.info("command ended: %r", exitmsg)
+                logger.debug("command ended with istatus %r.", exitmsg)
                 if os.WIFSIGNALED(istatus):
                     logger.error("command ended due to signal %s" %
                                  str(os.WTERMSIG(istatus)))
@@ -163,7 +162,7 @@ class CommandLineInterface(object):
                 elif os.WIFEXITED(istatus):
                     s = int(os.WTERMSIG(istatus))
                     if s > 0:
-                        logger.debug("command ended with exit code %s" %
+                        logger.error("command ended with exit code %s" %
                                      str(s))
                     sys.exit(s)
                 else:
