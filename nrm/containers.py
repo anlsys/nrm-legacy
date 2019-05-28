@@ -11,7 +11,7 @@
 from __future__ import print_function
 
 from aci import ImageManifest
-from json import load
+from yaml import load
 from collections import namedtuple
 import logging
 from subprograms import ChrtClient, NodeOSClient, resources, SingularityClient

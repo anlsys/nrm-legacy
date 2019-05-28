@@ -7,6 +7,7 @@ name = "pypi"
 "e1839a8" = {path = ".", editable = true}
 six = "==1.11.0"
 pyzmq = "*"
+PyYaml = "*"
 tornado = "*"
 numpy = "*"
 warlock = "*"
