@@ -14,9 +14,18 @@ import logging
 import xml.etree.ElementTree
 import tornado.process as process
 import subprocess
+import networkx as nx
 
 logger = logging.getLogger('nrm')
 resources = collections.namedtuple("Resources", ["cpus", "mems"])
+
+
+class Resource(object):
+    def __init__(self, nature, level=0, index=0):
+        self.nature = nature
+        self.availability = 100
+        self.level = level
+        self.index = index
 
 
 def logpopen(p, args, stdout, stderr):
@@ -217,6 +226,23 @@ class ChrtClient(object):
         return args
 
 
+def add_children_to_graph(graph, parent, element):
+    topo = element.findall('object')
+    if (topo != []):
+        for child in topo:
+            for child in topo:
+                new_resource = Resource(child.attrib['type'],
+                                        parent.level+1,
+                                        child.attrib['gp_index'])
+                graph.add_node(new_resource.index,
+                               nature=child.attrib['type'],
+                               availability=100,
+                               niv=parent.level+1)
+                graph.add_edge(parent.index, new_resource.index)
+                graph.resources[new_resource.index] = new_resource
+                add_children_to_graph(graph, new_resource, child)
+
+
 class HwlocClient(object):
 
     """Client to hwloc binaries."""
@@ -311,3 +337,29 @@ class HwlocClient(object):
         #    - split each (cpuset, mems) that is too big into a list of memset
         #    choices of the right size
         return dret.values()
+
+    def list_topo(self):
+        """Return resource graph of all cpus and mems."""
+        cmd = "lstopo"
+        args = [cmd, '--logical', '--output-format', 'xml']
+        p = subprocess.Popen(args, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+        stdout, stderr = p.communicate()
+        logpopen(p, args, stdout, stderr)
+        xmlroot = xml.etree.ElementTree.fromstring(stdout)
+        ret = nx.Graph()
+        ret.resources = {}
+
+        for child in xmlroot:
+            machine_element = child
+            machine = Resource(machine_element.attrib['type'],
+                               index=machine_element.attrib['gp_index'])
+            ret.add_node(machine.index, nature=machine_element.attrib['type'],
+                         availability=0, niv=0)
+            ret.resources[machine.index] = machine
+        add_children_to_graph(ret, machine, machine_element)
+
+        # if there's only one memory node, hwloc doesn't list it
+        if not ret.mems:
+            ret.mems.append(0)
+        return ret

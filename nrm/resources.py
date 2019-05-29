@@ -8,12 +8,30 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###############################################################################
 
+""" Resources Module:
+    This module provides the interfaces that manage the query of resources,
+    the tracking of theur use and the schedulong of new containers according to
+    partitioning rules.
+"""
 from __future__ import print_function
 
 import logging
+# import networkx as nx
 from subprograms import HwlocClient, resources
 
 logger = logging.getLogger('nrm')
+
+# class Resource(object):
+#     def __init__(self, nature, level = 0):
+#         self.nature = nature
+#         self.availability = 100
+#         self.level = level
+
+
+class ResourceGraph(object):
+
+    def __init__(self):
+        self.allresources = self.hwloc.listtopo()
 
 
 class ResourceManager(object):
