@@ -19,5 +19,5 @@ def has(self, f):
     return(f in self.app.keys())
 
 
-ImageManifest = loadschema("manifest")
+ImageManifest = loadschema("yml", "manifest")
 setattr(ImageManifest, "is_feature_enabled", has)

@@ -1,9 +1,8 @@
----
-name: basic
+name: "singularity"
 version: 0.0.1
 app:
-  container:
-    cpus: 2
+  slice:
+    cpus: 1
     mems: 1
 image:
   path: docker://ubuntu

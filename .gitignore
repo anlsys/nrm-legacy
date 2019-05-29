@@ -49,3 +49,7 @@ venv/
 
 # integration tests
 _output
+
+# documentation
+docs/_build
+docs/manifest.rst
