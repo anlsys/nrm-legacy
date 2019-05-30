@@ -25,8 +25,8 @@ system-installed dependency, regardless of whether Argo NodeOS or Singularity is
 
 The :doc:`quickstart <quickstart>` guide describes the use of `nrm` and `nrmd`.
 An important part of running tasks with `nrm` is the application :doc:`manifest
-<manifest>`, which you probably want to read about too.  Finally, please refer to the :doc:`libnrm <libnrm>` guide for
-application istrumentation.
+<manifest>`, which you probably want to read about too.  Finally, please refer
+to the :doc:`libnrm <libnrm>` guide for application istrumentation.
 
 .. toctree::
    :maxdepth: 2
