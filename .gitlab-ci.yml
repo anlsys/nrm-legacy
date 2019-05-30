@@ -8,8 +8,8 @@ stages:
   - build
   - test
   - applications
-  - docs
   - quality
+  - docs
 
 include:
   - https://xgitlab.cels.anl.gov/argo/argopkgs/raw/master/gitlab-ci/argonix.yml
