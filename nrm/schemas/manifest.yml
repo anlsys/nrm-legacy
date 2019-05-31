@@ -127,7 +127,6 @@ properties:
         required:
         - profile
         - policy
-        - damper
         - slowdown
         properties:
 # 
@@ -146,13 +145,7 @@ properties:
           profile:
             type: boolean
 # 
-# `damper` is a dampering parameter for the DDCM policy.::
-# 
-          damper:
-            type: number
-            minimum: 0
-# 
-# `slowdown` is a dampering parameter for the DVFS policy.::
+# `slowdown` is a parameter for the DVFS policy.::
 # 
           slowdown:
             type: number

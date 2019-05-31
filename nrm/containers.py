@@ -77,7 +77,7 @@ class ContainerManager(object):
                 container_power['profile']['end'] = dict()
             if pp['policy'] != "NONE":
                 container_power['policy'] = pp['policy']
-                container_power['damper'] = pp['damper']
+                container_power['damper'] = manifest.ratelimit
                 container_power['slowdown'] = pp['slowdown']
 
         # Compute hardware bindings
@@ -131,7 +131,7 @@ class ContainerManager(object):
         if container.power.get('policy'):
             environ['LD_PRELOAD'] = self.pmpi_lib
             environ['NRM_TRANSMIT'] = '1'
-            environ['NRM_DAMPER'] = container.power['damper']
+            environ['ARGO_NRM_RATELIMIT'] = container.power['damper']
 
         # monitoring section involves libnrm
         if manifest.is_feature_enabled('monitoring'):
